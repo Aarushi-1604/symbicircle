@@ -399,26 +399,37 @@
                 const data = await res.json();
 
                 if (res.ok) {
-                    // auto-login after register
-                    const loginRes = await fetch('/auth/login', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ email: payload.email, password: payload.password }),
-                    });
-                    const loginData = await loginRes.json();
-                    if (loginRes.ok) {
-                        localStorage.setItem('sc-token', loginData.access_token);
-                        showToast('Account created! Welcome to SymbiCircle 🎉', 'success');
-                        setTimeout(() => window.location.href = '/dashboard', 900);
+                    showToast('Account created! Signing you in…', 'success');
+                    try {
+                        const loginRes = await fetch('/auth/login', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ email: payload.email, password: payload.password }),
+                        });
+                        const loginData = await loginRes.json();
+                        if (loginRes.ok) {
+                            localStorage.setItem('sc-token', loginData.access_token);
+                            setTimeout(() => window.location.href = '/dashboard', 900);
+                        } else {
+                            showToast('Account created! Please sign in.', 'info');
+                            setTimeout(() => window.location.href = '/login', 1200);
+                        }
+                    } catch {
+                        showToast('Account created! Please sign in.', 'info');
+                        setTimeout(() => window.location.href = '/login', 1200);
                     }
                 } else {
-                    const msg = Array.isArray(data.detail)
-                        ? data.detail.map(d => d.msg).join(' ')
-                        : (data.detail || 'Registration failed.');
+                    let msg = 'Registration failed.';
+                    try {
+                        msg = Array.isArray(data.detail)
+                            ? data.detail.map(d => d.msg.replace('Value error, ', '')).join(' · ')
+                            : (data.detail || msg);
+                    } catch { }
                     showErr('step3Error', '❌ ' + msg);
                 }
-            } catch {
-                showErr('step3Error', '❌ Network error. Please try again.');
+            } catch (err) {
+                showErr('step3Error', `❌ Network error: ${err.message}. Check console.`);
+                console.error('Registration error:', err);
             } finally {
                 submitBtn.classList.remove('loading');
                 submitBtn.textContent = 'Create Account 🚀';
