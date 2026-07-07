@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sign In — SymbiCircle</title>
+    <link rel="stylesheet" href="/static/css/style.css" />
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>" />
+</head>
+
+<body>
+
+    <canvas id="particle-canvas"></canvas>
+    <div class="bg-orbs">
+        <div class="orb-mid"></div>
+    </div>
+
+    <nav class="navbar">
+        <a href="/" class="navbar-brand">⚡ SymbiCircle</a>
+        <div class="navbar-nav">
+            <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme">🌙</button>
+        </div>
+    </nav>
+
+    <div class="page-wrapper">
+        <div class="auth-container pt-nav">
+            <div class="auth-card">
+                <div class="auth-logo">⚡ SymbiCircle</div>
+                <div class="auth-tagline">SIT Pune's skill discovery network</div>
+
+                <h1 class="auth-title">Welcome back</h1>
+                <p class="auth-subtitle">Sign in with your campus email</p>
+
+                <form id="loginForm" novalidate>
+                    <div class="form-group">
+                        <label class="form-label" for="email">Campus Email</label>
+                        <input class="form-input" type="email" id="email" placeholder="yourname@sitpune.edu.in"
+                            autocomplete="email" required />
+                        <span class="form-error hidden" id="emailError"></span>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="password">Password</label>
+                        <div style="position:relative;">
+                            <input class="form-input" type="password" id="password" placeholder="Your password"
+                                autocomplete="current-password" required style="padding-right:3rem;" />
+                            <button type="button" id="togglePassword" style="position:absolute;right:0.9rem;top:50%;transform:translateY(-50%);
+                     background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:1rem;">
+                                👁️
+                            </button>
+                        </div>
+                        <span class="form-error hidden" id="passwordError"></span>
+                    </div>
+
+                    <div id="globalError" class="form-error hidden" style="margin-bottom:1rem;"></div>
+
+                    <button type="submit" class="btn btn-primary btn-block btn-lg" id="submitBtn">
+                        Sign In
+                    </button>
+                </form>
+
+                <div class="divider"></div>
+
+                <p class="text-center text-secondary" style="font-size:0.875rem;">
+                    No account yet?
+                    <a href="/register" style="color:var(--accent-violet-light);font-weight:600;">
+                        Create one →
+                    </a>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script>
+        // ── THEME ──────────────────────────────────────────────────
+        const html = document.documentElement;
+        const themeBtn = document.getElementById('themeToggle');
+        const saved = localStorage.getItem('sc-theme') || 'dark';
+        html.setAttribute('data-theme', saved);
+        themeBtn.textContent = saved === 'dark' ? '🌙' : '☀️';
+        themeBtn.addEventListener('click', () => {
+            const next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+            html.setAttribute('data-theme', next);
+            localStorage.setItem('sc-theme', next);
+            themeBtn.textContent = next === 'dark' ? '🌙' : '☀️';
+        });
+
+        // redirect if already logged in
+        if (localStorage.getItem('sc-token')) window.location.href = '/dashboard';
+
+        // ── PASSWORD TOGGLE ────────────────────────────────────────
+        document.getElementById('togglePassword').addEventListener('click', function () {
+            const input = document.getElementById('password');
+            input.type = input.type === 'password' ? 'text' : 'password';
+            this.textContent = input.type === 'password' ? '👁️' : '🔒';
+        });
+
+        // ── FORM VALIDATION + SUBMIT ───────────────────────────────
+        const form = document.getElementById('loginForm');
+        const submitBtn = document.getElementById('submitBtn');
+
+        function showError(id, msg) {
+            const el = document.getElementById(id);
+            el.textContent = msg;
+            el.classList.remove('hidden');
+        }
+        function clearErrors() {
+            ['emailError', 'passwordError', 'globalError'].forEach(id => {
+                const el = document.getElementById(id);
+                el.textContent = '';
+                el.classList.add('hidden');
+            });
+            document.getElementById('email').classList.remove('error');
+            document.getElementById('password').classList.remove('error');
+        }
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            clearErrors();
+
+            const email = document.getElementById('email').value.trim();
+            const password = document.getElementById('password').value;
+            let valid = true;
+
+            if (!email) {
+                showError('emailError', 'Email is required.');
+                document.getElementById('email').classList.add('error');
+                valid = false;
+            } else if (!email.endsWith('@sitpune.edu.in')) {
+                showError('emailError', 'Must be a @sitpune.edu.in address.');
+                document.getElementById('email').classList.add('error');
+                valid = false;
+            }
+
+            if (!password) {
+                showError('passwordError', 'Password is required.');
+                document.getElementById('password').classList.add('error');
+                valid = false;
+            }
+
+            if (!valid) return;
+
+            submitBtn.classList.add('loading');
+            submitBtn.textContent = 'Signing in…';
+
+            try {
+                const res = await fetch('/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password }),
+                });
+
+                const data = await res.json();
+
+                if (res.ok) {
+                    localStorage.setItem('sc-token', data.access_token);
+                    showToast('Welcome back! Redirecting…', 'success');
+                    setTimeout(() => window.location.href = '/dashboard', 800);
+                } else {
+                    const msg = data.detail || 'Invalid credentials.';
+                    showError('globalError', '❌ ' + msg);
+                    document.getElementById('email').classList.add('error');
+                    document.getElementById('password').classList.add('error');
+                }
+            } catch {
+                showError('globalError', '❌ Network error. Please try again.');
+            } finally {
+                submitBtn.classList.remove('loading');
+                submitBtn.textContent = 'Sign In';
+            }
+        });
+
+        // ── PARTICLE CANVAS (lightweight) ─────────────────────────
+        const canvas = document.getElementById('particle-canvas');
+        const ctx = canvas.getContext('2d');
+        let particles = [];
+
+        function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+
+        class P {
+            constructor() { this.reset(); }
+            reset() {
+                this.x = Math.random() * canvas.width;
+                this.y = Math.random() * canvas.height;
+                this.vx = (Math.random() - 0.5) * 0.3;
+                this.vy = (Math.random() - 0.5) * 0.3;
+                this.r = Math.random() * 1.5 + 0.3;
+                this.a = Math.random() * 0.4 + 0.1;
+                this.c = Math.random() > 0.5 ? '124,58,237' : '6,182,212';
+            }
+            update() {
+                this.x += this.vx; this.y += this.vy;
+                if (this.x < 0 || this.x > canvas.width || this.y < 0 || this.y > canvas.height) this.reset();
+            }
+            draw() {
+                ctx.beginPath(); ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(${this.c},${this.a})`; ctx.fill();
+            }
+        }
+
+        resize();
+        particles = Array.from({ length: 80 }, () => new P());
+        (function loop() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            particles.forEach(p => { p.update(); p.draw(); });
+            requestAnimationFrame(loop);
+        })();
+        window.addEventListener('resize', resize);
+
+        // ── TOAST ─────────────────────────────────────────────────
+        window.showToast = (msg, type = 'info') => {
+            const icons = { success: '✅', error: '❌', info: 'ℹ️' };
+            const c = document.getElementById('toastContainer');
+            const t = document.createElement('div');
+            t.className = `toast ${type}`;
+            t.innerHTML = `<span class="toast-icon">${icons[type]}</span><span>${msg}</span>`;
+            c.appendChild(t);
+            setTimeout(() => { t.classList.add('removing'); setTimeout(() => t.remove(), 200); }, 3500);
+        };
+    </script>
+</body>
+
+</html>

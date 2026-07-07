@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SymbiCircle — Find Your People at SIT</title>
+    <link rel="stylesheet" href="/static/css/style.css" />
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>" />
+</head>
+
+<body>
+
+    <canvas id="particle-canvas"></canvas>
+    <div class="bg-orbs">
+        <div class="orb-mid"></div>
+    </div>
+
+    <!-- NAVBAR -->
+    <nav class="navbar">
+        <span class="navbar-brand">⚡ SymbiCircle</span>
+        <div class="navbar-nav">
+            <a href="/login" class="nav-link">Sign in</a>
+            <a href="/register" class="btn btn-primary btn-sm">Join Campus</a>
+            <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme">🌙</button>
+        </div>
+    </nav>
+
+    <!-- HERO -->
+    <div class="page-wrapper">
+        <section class="hero">
+            <div class="hero-eyebrow">
+                <span>⚡</span> Exclusively for SIT Pune — @sitpune.edu.in
+            </div>
+
+            <h1 class="hero-title">
+                Find the right people<br />
+                <span class="gradient-text">before the deadline hits.</span>
+            </h1>
+
+            <p class="hero-subtitle">
+                SymbiCircle connects SIT students by skills — not just branches.
+                Find a Flutter dev, a CAD wizard, or a data nerd for your next project
+                in seconds.
+            </p>
+
+            <div class="hero-cta">
+                <a href="/register" class="btn btn-primary btn-xl animate-pulse-glow">
+                    🚀 Get Started Free
+                </a>
+                <a href="/login" class="btn btn-secondary btn-xl">
+                    Sign In
+                </a>
+            </div>
+
+            <div class="hero-stats">
+                <div class="hero-stat">
+                    <div class="hero-stat-number" id="statStudents">0</div>
+                    <div class="hero-stat-label">Students</div>
+                </div>
+                <div class="hero-stat">
+                    <div class="hero-stat-number" id="statSkills">0</div>
+                    <div class="hero-stat-label">Skills Mapped</div>
+                </div>
+                <div class="hero-stat">
+                    <div class="hero-stat-number" id="statBranches">6</div>
+                    <div class="hero-stat-label">Branches</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- FEATURES -->
+        <section class="container" style="padding-bottom: 6rem;">
+            <div style="text-align:center; margin-bottom: 3rem;">
+                <h2 class="font-primary" style="font-size:2rem; font-weight:700; letter-spacing:-0.02em;">
+                    Built for the way<br /><span class="text-gradient">college actually works</span>
+                </h2>
+            </div>
+
+            <div class="grid-cards-lg">
+                <div class="card" style="animation: fadeInUp 0.6s ease both 0.1s;">
+                    <div style="font-size:2rem; margin-bottom:1rem;">🔍</div>
+                    <h3 class="font-primary" style="font-size:1.1rem; font-weight:700; margin-bottom:0.5rem;">
+                        Semantic Skill Search
+                    </h3>
+                    <p class="text-secondary" style="font-size:0.9rem; line-height:1.7;">
+                        Search "NLP" and find everyone who listed "Natural Language Processing".
+                        Our alias engine resolves variations automatically.
+                    </p>
+                </div>
+
+                <div class="card" style="animation: fadeInUp 0.6s ease both 0.2s;">
+                    <div style="font-size:2rem; margin-bottom:1rem;">🤖</div>
+                    <h3 class="font-primary" style="font-size:1.1rem; font-weight:700; margin-bottom:0.5rem;">
+                        AI-Powered Fallback
+                    </h3>
+                    <p class="text-secondary" style="font-size:0.9rem; line-height:1.7;">
+                        Zero results? The AI recommends students with adjacent skills —
+                        so "React" finds people with JavaScript, HTML, and frontend experience too.
+                    </p>
+                </div>
+
+                <div class="card" style="animation: fadeInUp 0.6s ease both 0.3s;">
+                    <div style="font-size:2rem; margin-bottom:1rem;">🎓</div>
+                    <h3 class="font-primary" style="font-size:1.1rem; font-weight:700; margin-bottom:0.5rem;">
+                        Campus-Only Access
+                    </h3>
+                    <p class="text-secondary" style="font-size:0.9rem; line-height:1.7;">
+                        Strictly gated to @sitpune.edu.in emails. Filter by branch and batch
+                        to find exactly who you need.
+                    </p>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- TOAST CONTAINER -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script>
+        // ── THEME ──────────────────────────────────────────────────
+        const html = document.documentElement;
+        const themeBtn = document.getElementById('themeToggle');
+        const saved = localStorage.getItem('sc-theme') || 'dark';
+        html.setAttribute('data-theme', saved);
+        themeBtn.textContent = saved === 'dark' ? '🌙' : '☀️';
+
+        themeBtn.addEventListener('click', () => {
+            const next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+            html.setAttribute('data-theme', next);
+            localStorage.setItem('sc-theme', next);
+            themeBtn.textContent = next === 'dark' ? '🌙' : '☀️';
+        });
+
+        // ── REDIRECT IF ALREADY LOGGED IN ─────────────────────────
+        if (localStorage.getItem('sc-token')) {
+            window.location.href = '/dashboard';
+        }
+
+        // ── ANIMATED COUNTERS ──────────────────────────────────────
+        async function loadStats() {
+            try {
+                const res = await fetch('/skills/?limit=1');
+                const skillRes = await fetch('/skills/');
+                const skills = await skillRes.json();
+                animateCount('statSkills', skills.length);
+            } catch { }
+        }
+
+        function animateCount(id, target) {
+            const el = document.getElementById(id);
+            if (!el) return;
+            let start = 0;
+            const duration = 1800;
+            const step = timestamp => {
+                if (!start) start = timestamp;
+                const progress = Math.min((timestamp - start) / duration, 1);
+                const ease = 1 - Math.pow(1 - progress, 3);
+                el.textContent = Math.floor(ease * target);
+                if (progress < 1) requestAnimationFrame(step);
+                else el.textContent = target;
+            };
+            requestAnimationFrame(step);
+        }
+
+        loadStats();
+        animateCount('statStudents', 0);
+
+        // ── PARTICLE CANVAS ────────────────────────────────────────
+        const canvas = document.getElementById('particle-canvas');
+        const ctx = canvas.getContext('2d');
+        let particles = [];
+        let animFrame;
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+
+        function hexToRgb(isDark) {
+            return isDark ? '124,58,237' : '124,58,237';
+        }
+
+        class Particle {
+            constructor() { this.reset(); }
+            reset() {
+                this.x = Math.random() * canvas.width;
+                this.y = Math.random() * canvas.height;
+                this.vx = (Math.random() - 0.5) * 0.4;
+                this.vy = (Math.random() - 0.5) * 0.4;
+                this.r = Math.random() * 1.8 + 0.4;
+                this.alpha = Math.random() * 0.5 + 0.1;
+                this.color = Math.random() > 0.5 ? '124,58,237' : '6,182,212';
+            }
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                if (this.x < 0 || this.x > canvas.width ||
+                    this.y < 0 || this.y > canvas.height) this.reset();
+            }
+            draw() {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(${this.color},${this.alpha})`;
+                ctx.fill();
+            }
+        }
+
+        function initParticles(count = 120) {
+            particles = Array.from({ length: count }, () => new Particle());
+        }
+
+        function drawConnections() {
+            const maxDist = 120;
+            for (let i = 0; i < particles.length; i++) {
+                for (let j = i + 1; j < particles.length; j++) {
+                    const dx = particles[i].x - particles[j].x;
+                    const dy = particles[i].y - particles[j].y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    if (dist < maxDist) {
+                        const alpha = (1 - dist / maxDist) * 0.15;
+                        ctx.beginPath();
+                        ctx.moveTo(particles[i].x, particles[i].y);
+                        ctx.lineTo(particles[j].x, particles[j].y);
+                        ctx.strokeStyle = `rgba(124,58,237,${alpha})`;
+                        ctx.lineWidth = 0.5;
+                        ctx.stroke();
+                    }
+                }
+            }
+        }
+
+        function animate() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            particles.forEach(p => { p.update(); p.draw(); });
+            drawConnections();
+            animFrame = requestAnimationFrame(animate);
+        }
+
+        resizeCanvas();
+        initParticles();
+        animate();
+        window.addEventListener('resize', () => { resizeCanvas(); initParticles(); });
+
+        // ── TOAST UTILITY (shared across pages) ───────────────────
+        window.showToast = (msg, type = 'info') => {
+            const icons = { success: '✅', error: '❌', info: 'ℹ️' };
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.innerHTML = `<span class="toast-icon">${icons[type]}</span><span>${msg}</span>`;
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.classList.add('removing');
+                setTimeout(() => toast.remove(), 200);
+            }, 3500);
+        };
+    </script>
+</body>
+
+</html>
