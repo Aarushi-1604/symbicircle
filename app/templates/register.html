@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Create Account — SymbiCircle</title>
+    <link rel="stylesheet" href="/static/css/style.css" />
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>" />
+</head>
+
+<body>
+
+    <canvas id="particle-canvas"></canvas>
+    <div class="bg-orbs">
+        <div class="orb-mid"></div>
+    </div>
+
+    <nav class="navbar">
+        <a href="/" class="navbar-brand">⚡ SymbiCircle</a>
+        <div class="navbar-nav">
+            <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme">🌙</button>
+        </div>
+    </nav>
+
+    <div class="page-wrapper">
+        <div class="auth-container pt-nav" style="padding-top:calc(var(--nav-height) + 2rem); align-items:flex-start;">
+            <div class="auth-card" style="max-width:520px;">
+
+                <div class="auth-logo">⚡ SymbiCircle</div>
+                <div class="auth-tagline">Join SIT Pune's skill network</div>
+
+                <!-- STEP PROGRESS -->
+                <div class="step-progress" id="stepProgress">
+                    <div class="step-dot active" id="dot1">1</div>
+                    <div class="step-line" id="line1"></div>
+                    <div class="step-dot" id="dot2">2</div>
+                    <div class="step-line" id="line2"></div>
+                    <div class="step-dot" id="dot3">3</div>
+                </div>
+
+                <!-- STEP 1: Identity -->
+                <div id="step1">
+                    <h1 class="auth-title">Who are you?</h1>
+                    <p class="auth-subtitle">Your campus identity — used to verify you're SIT.</p>
+
+                    <div class="form-group">
+                        <label class="form-label">Full Name</label>
+                        <input class="form-input" type="text" id="fullName" placeholder="Aarushi Sharma" />
+                        <span class="form-error hidden" id="fullNameError"></span>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Campus Email</label>
+                        <input class="form-input" type="email" id="email" placeholder="yourname@sitpune.edu.in" />
+                        <span class="form-error hidden" id="emailError"></span>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Password</label>
+                        <div style="position:relative;">
+                            <input class="form-input" type="password" id="password" placeholder="Min. 8 characters"
+                                style="padding-right:3rem;" />
+                            <button type="button" id="togglePass" style="position:absolute;right:0.9rem;top:50%;transform:translateY(-50%);
+                     background:none;border:none;cursor:pointer;color:var(--text-muted);">
+                                👁️
+                            </button>
+                        </div>
+                        <span class="form-error hidden" id="passwordError"></span>
+                    </div>
+
+                    <button class="btn btn-primary btn-block btn-lg" id="nextStep1">
+                        Continue →
+                    </button>
+                </div>
+
+                <!-- STEP 2: Academic -->
+                <div id="step2" class="hidden">
+                    <h1 class="auth-title">Your academics</h1>
+                    <p class="auth-subtitle">This helps students find the right peers.</p>
+
+                    <div class="form-group">
+                        <label class="form-label">Branch</label>
+                        <select class="form-select" id="branch">
+                            <option value="">Select your branch</option>
+                            <option value="AIML">AIML — AI & Machine Learning</option>
+                            <option value="CSE">CSE — Computer Science</option>
+                            <option value="ENTC">ENTC — Electronics & Telecom</option>
+                            <option value="RA">RA — Robotics & Automation</option>
+                            <option value="CIVIL">CIVIL — Civil Engineering</option>
+                            <option value="MECH">MECH — Mechanical Engineering</option>
+                        </select>
+                        <span class="form-error hidden" id="branchError"></span>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Batch</label>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;" id="batchGrid">
+                            <button type="button" class="btn btn-ghost batch-btn" data-batch="2023-27">2023–27</button>
+                            <button type="button" class="btn btn-ghost batch-btn" data-batch="2024-28">2024–28</button>
+                            <button type="button" class="btn btn-ghost batch-btn" data-batch="2025-29">2025–29</button>
+                            <button type="button" class="btn btn-ghost batch-btn" data-batch="2026-30">2026–30</button>
+                        </div>
+                        <span class="form-error hidden" id="batchError"></span>
+                    </div>
+
+                    <div style="display:flex;gap:0.75rem;">
+                        <button class="btn btn-ghost btn-lg flex-1" id="backStep2">← Back</button>
+                        <button class="btn btn-primary btn-lg flex-1" id="nextStep2">Continue →</button>
+                    </div>
+                </div>
+
+                <!-- STEP 3: Skills -->
+                <div id="step3" class="hidden">
+                    <h1 class="auth-title">Your skills</h1>
+                    <p class="auth-subtitle">Add at least 5. This is how others find you.</p>
+
+                    <div class="form-group">
+                        <label class="form-label">Search & add skills</label>
+                        <div class="skill-picker">
+                            <div class="skill-picker-chips" id="chipContainer"
+                                onclick="document.getElementById('skillInput').focus()">
+                                <input class="skill-picker-input" type="text" id="skillInput"
+                                    placeholder="Type a skill — e.g. Python, CAD, React…" autocomplete="off" />
+                            </div>
+                            <div class="skill-dropdown" id="skillDropdown"></div>
+                        </div>
+                        <div class="skill-counter" id="skillCounter">0 / 5 minimum selected</div>
+                    </div>
+
+                    <div id="step3Error" class="form-error hidden" style="margin-bottom:1rem;"></div>
+
+                    <div style="display:flex;gap:0.75rem;">
+                        <button class="btn btn-ghost btn-lg flex-1" id="backStep3">← Back</button>
+                        <button class="btn btn-primary btn-lg flex-1" id="submitBtn" disabled>
+                            Create Account 🚀
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script>
+        // ── THEME ──────────────────────────────────────────────────
+        const html = document.documentElement;
+        const themeBtn = document.getElementById('themeToggle');
+        const saved = localStorage.getItem('sc-theme') || 'dark';
+        html.setAttribute('data-theme', saved);
+        themeBtn.textContent = saved === 'dark' ? '🌙' : '☀️';
+        themeBtn.addEventListener('click', () => {
+            const next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+            html.setAttribute('data-theme', next);
+            localStorage.setItem('sc-theme', next);
+            themeBtn.textContent = next === 'dark' ? '🌙' : '☀️';
+        });
+
+        if (localStorage.getItem('sc-token')) window.location.href = '/dashboard';
+
+        // ── STEP MACHINE ───────────────────────────────────────────
+        let currentStep = 1;
+        const steps = { 1: 'step1', 2: 'step2', 3: 'step3' };
+
+        function goToStep(n) {
+            Object.values(steps).forEach(id => document.getElementById(id).classList.add('hidden'));
+            document.getElementById(steps[n]).classList.remove('hidden');
+
+            [1, 2, 3].forEach(i => {
+                const dot = document.getElementById(`dot${i}`);
+                const line = document.getElementById(`line${i}`);
+                dot.classList.remove('active', 'done');
+                if (line) line.classList.remove('done');
+                if (i < n) { dot.classList.add('done'); dot.textContent = '✓'; if (line) line.classList.add('done'); }
+                if (i === n) { dot.classList.add('active'); dot.textContent = i; }
+                if (i > n) { dot.textContent = i; }
+            });
+
+            currentStep = n;
+        }
+
+        // ── PASSWORD TOGGLE ────────────────────────────────────────
+        document.getElementById('togglePass').addEventListener('click', function () {
+            const p = document.getElementById('password');
+            p.type = p.type === 'password' ? 'text' : 'password';
+            this.textContent = p.type === 'password' ? '👁️' : '🔒';
+        });
+
+        // ── FORM ERROR HELPERS ─────────────────────────────────────
+        function showErr(id, msg) {
+            const el = document.getElementById(id);
+            el.textContent = msg; el.classList.remove('hidden');
+        }
+        function clearErr(id) {
+            const el = document.getElementById(id);
+            el.textContent = ''; el.classList.add('hidden');
+        }
+
+        // ── STEP 1 VALIDATION ─────────────────────────────────────
+        document.getElementById('nextStep1').addEventListener('click', () => {
+            let ok = true;
+            ['fullNameError', 'emailError', 'passwordError'].forEach(clearErr);
+
+            const name = document.getElementById('fullName').value.trim();
+            const email = document.getElementById('email').value.trim();
+            const pass = document.getElementById('password').value;
+
+            if (!name) { showErr('fullNameError', 'Full name is required.'); ok = false; }
+            if (!email) { showErr('emailError', 'Email is required.'); ok = false; }
+            else if (!email.endsWith('@sitpune.edu.in')) {
+                showErr('emailError', 'Only @sitpune.edu.in emails allowed.'); ok = false;
+            }
+            if (pass.length < 8) { showErr('passwordError', 'Minimum 8 characters.'); ok = false; }
+
+            if (ok) goToStep(2);
+        });
+
+        // ── STEP 2: BATCH PICKER ───────────────────────────────────
+        let selectedBatch = '';
+        document.querySelectorAll('.batch-btn').forEach(btn => {
+            btn.addEventListener('click', function () {
+                document.querySelectorAll('.batch-btn').forEach(b => {
+                    b.classList.remove('btn-primary');
+                    b.classList.add('btn-ghost');
+                });
+                this.classList.remove('btn-ghost');
+                this.classList.add('btn-primary');
+                selectedBatch = this.dataset.batch;
+                clearErr('batchError');
+            });
+        });
+
+        document.getElementById('nextStep2').addEventListener('click', () => {
+            let ok = true;
+            clearErr('branchError'); clearErr('batchError');
+
+            if (!document.getElementById('branch').value) {
+                showErr('branchError', 'Please select your branch.'); ok = false;
+            }
+            if (!selectedBatch) {
+                showErr('batchError', 'Please select your batch.'); ok = false;
+            }
+            if (ok) goToStep(3);
+        });
+
+        document.getElementById('backStep2').addEventListener('click', () => goToStep(1));
+        document.getElementById('backStep3').addEventListener('click', () => goToStep(2));
+
+        // ── STEP 3: SKILL TYPE-AHEAD ───────────────────────────────
+        const selectedSkills = new Map(); // id → name
+        let debounceTimer;
+        let dropdownHighlight = -1;
+
+        const skillInput = document.getElementById('skillInput');
+        const chipContainer = document.getElementById('chipContainer');
+        const dropdown = document.getElementById('skillDropdown');
+        const counter = document.getElementById('skillCounter');
+        const submitBtn = document.getElementById('submitBtn');
+
+        function updateCounter() {
+            const n = selectedSkills.size;
+            counter.textContent = `${n} / 5 minimum selected`;
+            counter.className = 'skill-counter' + (n >= 5 ? ' satisfied' : '');
+            submitBtn.disabled = n < 5;
+        }
+
+        function renderChip(id, name) {
+            const chip = document.createElement('span');
+            chip.className = 'chip';
+            chip.dataset.id = id;
+            chip.innerHTML = `${name} <button class="chip-remove" data-id="${id}" aria-label="Remove ${name}">✕</button>`;
+            chip.querySelector('.chip-remove').addEventListener('click', (e) => {
+                e.stopPropagation();
+                selectedSkills.delete(id);
+                chip.remove();
+                updateCounter();
+            });
+            chipContainer.insertBefore(chip, skillInput);
+        }
+
+        function addSkill(id, name) {
+            if (selectedSkills.has(id)) return;
+            selectedSkills.set(id, name);
+            renderChip(id, name);
+            skillInput.value = '';
+            dropdown.classList.remove('open');
+            dropdown.innerHTML = '';
+            dropdownHighlight = -1;
+            updateCounter();
+        }
+
+        function buildDropdown(items, query) {
+            dropdown.innerHTML = '';
+            dropdownHighlight = -1;
+
+            if (!items.length && query.length > 1) {
+                const item = document.createElement('div');
+                item.className = 'skill-dropdown-item';
+                item.innerHTML = `<span>${query}</span><span class="new-badge">+ Create</span>`;
+                item.addEventListener('click', () => createNewSkill(query));
+                dropdown.appendChild(item);
+            }
+
+            items.forEach(skill => {
+                if (selectedSkills.has(skill.id)) return;
+                const item = document.createElement('div');
+                item.className = 'skill-dropdown-item';
+                item.textContent = skill.name;
+                item.addEventListener('click', () => addSkill(skill.id, skill.name));
+                dropdown.appendChild(item);
+            });
+
+            dropdown.classList.toggle('open', dropdown.children.length > 0);
+        }
+
+        async function searchSkills(q) {
+            try {
+                const res = await fetch(`/skills/search?q=${encodeURIComponent(q)}&limit=8`);
+                const data = await res.json();
+                buildDropdown(data, q);
+            } catch { dropdown.classList.remove('open'); }
+        }
+
+        async function createNewSkill(name) {
+            const token = localStorage.getItem('sc-token');
+            if (!token) {
+                showToast('Please sign in first to create new skills.', 'error');
+                return;
+            }
+            try {
+                const res = await fetch(`/skills/?name=${encodeURIComponent(name)}`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (res.ok) {
+                    const skill = await res.json();
+                    addSkill(skill.id, skill.name);
+                    showToast(`"${skill.name}" created and added!`, 'success');
+                }
+            } catch { showToast('Could not create skill. Try again.', 'error'); }
+        }
+
+        skillInput.addEventListener('input', () => {
+            const q = skillInput.value.trim();
+            clearTimeout(debounceTimer);
+            if (q.length < 1) { dropdown.classList.remove('open'); return; }
+            debounceTimer = setTimeout(() => searchSkills(q), 220);
+        });
+
+        skillInput.addEventListener('keydown', (e) => {
+            const items = dropdown.querySelectorAll('.skill-dropdown-item');
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                dropdownHighlight = Math.min(dropdownHighlight + 1, items.length - 1);
+                items.forEach((el, i) => el.classList.toggle('highlighted', i === dropdownHighlight));
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                dropdownHighlight = Math.max(dropdownHighlight - 1, 0);
+                items.forEach((el, i) => el.classList.toggle('highlighted', i === dropdownHighlight));
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                if (dropdownHighlight >= 0 && items[dropdownHighlight]) {
+                    items[dropdownHighlight].click();
+                }
+            } else if (e.key === 'Escape') {
+                dropdown.classList.remove('open');
+            }
+        });
+
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.skill-picker')) dropdown.classList.remove('open');
+        });
+
+        // ── SUBMIT ─────────────────────────────────────────────────
+        document.getElementById('submitBtn').addEventListener('click', async () => {
+            clearErr('step3Error');
+
+            const payload = {
+                full_name: document.getElementById('fullName').value.trim(),
+                email: document.getElementById('email').value.trim(),
+                password: document.getElementById('password').value,
+                branch: document.getElementById('branch').value,
+                batch: selectedBatch,
+                skill_ids: [...selectedSkills.keys()],
+            };
+
+            submitBtn.classList.add('loading');
+            submitBtn.textContent = 'Creating account…';
+
+            try {
+                const res = await fetch('/auth/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+                const data = await res.json();
+
+                if (res.ok) {
+                    // auto-login after register
+                    const loginRes = await fetch('/auth/login', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ email: payload.email, password: payload.password }),
+                    });
+                    const loginData = await loginRes.json();
+                    if (loginRes.ok) {
+                        localStorage.setItem('sc-token', loginData.access_token);
+                        showToast('Account created! Welcome to SymbiCircle 🎉', 'success');
+                        setTimeout(() => window.location.href = '/dashboard', 900);
+                    }
+                } else {
+                    const msg = Array.isArray(data.detail)
+                        ? data.detail.map(d => d.msg).join(' ')
+                        : (data.detail || 'Registration failed.');
+                    showErr('step3Error', '❌ ' + msg);
+                }
+            } catch {
+                showErr('step3Error', '❌ Network error. Please try again.');
+            } finally {
+                submitBtn.classList.remove('loading');
+                submitBtn.textContent = 'Create Account 🚀';
+                submitBtn.disabled = selectedSkills.size < 5;
+            }
+        });
+
+        // ── PARTICLE CANVAS ────────────────────────────────────────
+        const canvas = document.getElementById('particle-canvas');
+        const ctx = canvas.getContext('2d');
+        let pts = [];
+        function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+        class P {
+            constructor() { this.reset(); }
+            reset() {
+                this.x = Math.random() * canvas.width; this.y = Math.random() * canvas.height;
+                this.vx = (Math.random() - .5) * .3; this.vy = (Math.random() - .5) * .3;
+                this.r = Math.random() * 1.5 + .3; this.a = Math.random() * .4 + .1;
+                this.c = Math.random() > .5 ? '124,58,237' : '6,182,212';
+            }
+            update() {
+                this.x += this.vx; this.y += this.vy;
+                if (this.x < 0 || this.x > canvas.width || this.y < 0 || this.y > canvas.height) this.reset();
+            }
+            draw() {
+                ctx.beginPath(); ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(${this.c},${this.a})`; ctx.fill();
+            }
+        }
+        resize();
+        pts = Array.from({ length: 80 }, () => new P());
+        (function loop() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            pts.forEach(p => { p.update(); p.draw(); });
+            requestAnimationFrame(loop);
+        })();
+        window.addEventListener('resize', resize);
+
+        // ── TOAST ─────────────────────────────────────────────────
+        window.showToast = (msg, type = 'info') => {
+            const icons = { success: '✅', error: '❌', info: 'ℹ️' };
+            const c = document.getElementById('toastContainer');
+            const t = document.createElement('div');
+            t.className = `toast ${type}`;
+            t.innerHTML = `<span class="toast-icon">${icons[type]}</span><span>${msg}</span>`;
+            c.appendChild(t);
+            setTimeout(() => { t.classList.add('removing'); setTimeout(() => t.remove(), 200); }, 3500);
+        };
+    </script>
+</body>
+
+</html>
