@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Profile — SymbiCircle</title>
+    <link rel="stylesheet" href="/static/css/style.css" />
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>" />
+</head>
+
+<body>
+
+    <canvas id="particle-canvas"></canvas>
+    <div class="bg-orbs">
+        <div class="orb-mid"></div>
+    </div>
+
+    <nav class="navbar">
+        <a href="/dashboard" class="navbar-brand">⚡ SymbiCircle</a>
+        <div class="navbar-nav">
+            <a href="/dashboard" class="nav-link">← Dashboard</a>
+            <button class="btn btn-ghost btn-sm" id="logoutBtn">Sign out</button>
+            <button class="theme-toggle" id="themeToggle">🌙</button>
+        </div>
+    </nav>
+
+    <div class="page-wrapper" style="padding-top:var(--nav-height);">
+        <div style="max-width:780px;margin:0 auto;padding:2.5rem 1.5rem 4rem;">
+
+            <!-- LOADING SKELETON -->
+            <div id="profileLoading">
+                <div class="card card-lg">
+                    <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1.5rem;">
+                        <div class="skeleton" style="width:80px;height:80px;border-radius:50%;flex-shrink:0;"></div>
+                        <div style="flex:1;">
+                            <div class="skeleton skeleton-title" style="width:50%;"></div>
+                            <div class="skeleton skeleton-text" style="width:35%;"></div>
+                            <div class="skeleton skeleton-text" style="width:45%;"></div>
+                        </div>
+                    </div>
+                    <div style="display:flex;flex-wrap:wrap;gap:0.5rem;">
+                        <div class="skeleton skeleton-chip"></div>
+                        <div class="skeleton skeleton-chip"></div>
+                        <div class="skeleton skeleton-chip"></div>
+                        <div class="skeleton skeleton-chip"></div>
+                        <div class="skeleton skeleton-chip"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PROFILE CONTENT -->
+            <div id="profileContent" style="display:none;">
+
+                <div class="card card-lg" style="margin-bottom:1.5rem;animation:cardEntrance 0.5s ease both;">
+
+                    <div style="display:flex;align-items:center;gap:1.25rem;margin-bottom:1.5rem;flex-wrap:wrap;">
+                        <div id="profileAvatar" style="width:80px;height:80px;border-radius:50%;background:var(--grad-primary);
+                   display:flex;align-items:center;justify-content:center;
+                   font-family:var(--font-primary);font-size:2rem;font-weight:700;
+                   color:white;flex-shrink:0;box-shadow:var(--shadow-glow);">
+                        </div>
+                        <div style="flex:1;min-width:180px;">
+                            <h1 id="profileName"
+                                style="font-family:var(--font-primary);font-size:1.6rem;font-weight:700;margin-bottom:0.2rem;">
+                            </h1>
+                            <div id="profileMeta" class="text-secondary" style="font-size:0.9rem;margin-bottom:0.4rem;">
+                            </div>
+                            <div id="profileEmail" style="font-size:0.82rem;color:var(--text-muted);"></div>
+                        </div>
+                        <div id="profileBadge"></div>
+                    </div>
+
+                    <div class="divider"></div>
+
+                    <div style="margin-top:1.25rem;">
+                        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;">
+                            <h2 style="font-family:var(--font-primary);font-size:1rem;font-weight:600;">Skills</h2>
+                            <button id="addSkillToggle" style="display:none;" class="btn btn-secondary btn-sm">+ Add
+                                Skill</button>
+                        </div>
+
+                        <!-- Add skill area (owner only) -->
+                        <div id="addSkillArea" style="display:none;margin-bottom:1.25rem;">
+                            <div class="skill-picker">
+                                <div class="skill-picker-chips" id="addChipContainer"
+                                    onclick="document.getElementById('addSkillInput').focus()" style="min-height:auto;">
+                                    <input class="skill-picker-input" type="text" id="addSkillInput"
+                                        placeholder="Search to add a skill…" autocomplete="off" />
+                                </div>
+                                <div class="skill-dropdown" id="addSkillDropdown"></div>
+                            </div>
+                        </div>
+
+                        <div id="skillsDisplay" style="display:flex;flex-wrap:wrap;gap:0.5rem;"></div>
+                        <div id="noSkills" style="display:none;font-size:0.875rem;color:var(--text-muted);">No skills
+                            listed yet.</div>
+                    </div>
+                </div>
+
+                <!-- Contact card (public view only) -->
+                <div id="contactCard" style="display:none;" class="card"
+                    style="animation:cardEntrance 0.5s ease both 0.1s;">
+                    <h2 style="font-family:var(--font-primary);font-size:1rem;font-weight:600;margin-bottom:1rem;">Get
+                        in touch</h2>
+                    <div style="display:flex;align-items:center;gap:0.75rem;">
+                        <span style="font-size:1.3rem;">✉️</span>
+                        <div>
+                            <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:0.15rem;">Campus email
+                            </div>
+                            <a id="contactEmail" href="#"
+                                style="font-weight:600;color:var(--accent-violet-light);font-size:0.95rem;"></a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ERROR STATE -->
+            <div id="profileError" style="display:none;">
+                <div class="empty-state">
+                    <div class="empty-state-icon">😕</div>
+                    <div class="empty-state-title">Profile not found</div>
+                    <div class="empty-state-text">This student doesn't exist or their account is inactive.</div>
+                    <a href="/dashboard" class="btn btn-primary" style="margin-top:1rem;">Back to Dashboard</a>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script>
+        // ── THEME ──────────────────────────────────────────────────
+        const html = document.documentElement;
+        const themeBtn = document.getElementById('themeToggle');
+        const savedTheme = localStorage.getItem('sc-theme') || 'dark';
+        html.setAttribute('data-theme', savedTheme);
+        themeBtn.textContent = savedTheme === 'dark' ? '🌙' : '☀️';
+        themeBtn.addEventListener('click', () => {
+            const next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+            html.setAttribute('data-theme', next);
+            localStorage.setItem('sc-theme', next);
+            themeBtn.textContent = next === 'dark' ? '🌙' : '☀️';
+        });
+
+        // ── AUTH ───────────────────────────────────────────────────
+        const token = localStorage.getItem('sc-token');
+        if (!token) window.location.href = '/login';
+        const authHeaders = { 'Authorization': `Bearer ${token}` };
+
+        document.getElementById('logoutBtn').addEventListener('click', () => {
+            localStorage.removeItem('sc-token');
+            window.location.href = '/';
+        });
+
+        // ── RESOLVE USER ID ────────────────────────────────────────
+        const pathParts = window.location.pathname.split('/').filter(Boolean);
+        const urlUserId = pathParts[pathParts.length - 1];
+
+        let currentUser = null;
+        let profileUser = null;
+        let isOwner = false;
+
+        async function init() {
+            try {
+                const meRes = await fetch('/auth/me', { headers: authHeaders });
+                if (!meRes.ok) { localStorage.removeItem('sc-token'); window.location.href = '/login'; return; }
+                currentUser = await meRes.json();
+
+                const targetId = (urlUserId === 'me') ? currentUser.id : urlUserId;
+                isOwner = (targetId === currentUser.id);
+
+                const endpoint = isOwner ? '/users/me' : `/users/${targetId}`;
+                const profileRes = await fetch(endpoint, { headers: authHeaders });
+
+                if (!profileRes.ok) {
+                    document.getElementById('profileLoading').style.display = 'none';
+                    document.getElementById('profileError').style.display = 'block';
+                    return;
+                }
+
+                profileUser = await profileRes.json();
+                renderProfile();
+            } catch {
+                document.getElementById('profileLoading').style.display = 'none';
+                document.getElementById('profileError').style.display = 'block';
+            }
+        }
+
+        function renderProfile() {
+            document.getElementById('profileLoading').style.display = 'none';
+            document.getElementById('profileContent').style.display = 'block';
+
+            const initials = profileUser.full_name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+            document.getElementById('profileAvatar').textContent = initials;
+            document.getElementById('profileName').textContent = profileUser.full_name;
+            document.getElementById('profileMeta').textContent = `${profileUser.branch} · Batch ${profileUser.batch}`;
+            document.getElementById('profileEmail').textContent = profileUser.email;
+            document.title = `${profileUser.full_name} — SymbiCircle`;
+
+            if (isOwner) {
+                document.getElementById('profileBadge').innerHTML = `<span class="badge badge-violet">Your Profile</span>`;
+                document.getElementById('addSkillToggle').style.display = 'inline-flex';
+                document.getElementById('contactCard').style.display = 'none';
+            } else {
+                document.getElementById('contactCard').style.display = 'block';
+                document.getElementById('contactEmail').textContent = profileUser.email;
+                document.getElementById('contactEmail').href = `mailto:${profileUser.email}`;
+            }
+
+            renderSkills();
+        }
+
+        function renderSkills() {
+            const display = document.getElementById('skillsDisplay');
+            const noSkills = document.getElementById('noSkills');
+            const skills = profileUser.skills || [];
+
+            if (!skills.length) {
+                display.style.display = 'none';
+                noSkills.style.display = 'block';
+                return;
+            }
+
+            noSkills.style.display = 'none';
+            display.style.display = 'flex';
+            display.innerHTML = skills.map(s => isOwner ? `
+    <span class="chip">
+      ${s.name}
+      <button class="chip-remove" onclick="deleteSkill('${s.id}','${s.name}')" title="Remove">✕</button>
+    </span>` : `<span class="chip">${s.name}</span>`
+            ).join('');
+        }
+
+        // ── DELETE SKILL ───────────────────────────────────────────
+        async function deleteSkill(skillId, skillName) {
+            if (!confirm(`Remove "${skillName}" from your profile?`)) return;
+            try {
+                const res = await fetch(`/users/me/skills/${skillId}`, { method: 'DELETE', headers: authHeaders });
+                if (res.ok) {
+                    profileUser.skills = profileUser.skills.filter(s => s.id !== skillId);
+                    renderSkills();
+                    showToast(`"${skillName}" removed.`, 'info');
+                } else {
+                    const d = await res.json();
+                    showToast(d.detail || 'Could not remove skill.', 'error');
+                }
+            } catch { showToast('Network error.', 'error'); }
+        }
+
+        // ── ADD SKILL TYPE-AHEAD ───────────────────────────────────
+        const addToggle = document.getElementById('addSkillToggle');
+        const addArea = document.getElementById('addSkillArea');
+        const addInput = document.getElementById('addSkillInput');
+        const addDropdown = document.getElementById('addSkillDropdown');
+        let addDebounce;
+        let addRequestId = 0;
+
+        addToggle.addEventListener('click', () => {
+            const open = addArea.style.display !== 'none';
+            addArea.style.display = open ? 'none' : 'block';
+            addToggle.textContent = open ? '+ Add Skill' : '✕ Cancel';
+            if (!open) addInput.focus();
+        });
+
+        addInput.addEventListener('input', () => {
+            clearTimeout(addDebounce);
+            const q = addInput.value.trim();
+            if (q.length < 2) { addDropdown.classList.remove('open'); return; }
+            addDropdown.innerHTML = `<div class="skill-dropdown-item text-muted" style="cursor:default;">
+    <span class="spinner" style="width:12px;height:12px;margin-right:6px;"></span>Searching…</div>`;
+            addDropdown.classList.add('open');
+            addDebounce = setTimeout(() => searchAddSkill(q), 280);
+        });
+
+        async function searchAddSkill(q) {
+            const rid = ++addRequestId;
+            try {
+                const res = await fetch(`/skills/search?q=${encodeURIComponent(q)}&limit=8`);
+                if (rid !== addRequestId) return;
+                const items = await res.json();
+                buildAddDropdown(items, q);
+            } catch { addDropdown.classList.remove('open'); }
+        }
+
+        function buildAddDropdown(items, query) {
+            addDropdown.innerHTML = '';
+            const existingIds = new Set((profileUser.skills || []).map(s => s.id));
+            const filtered = items.filter(s => !existingIds.has(s.id));
+            const trimmed = query.trim();
+
+            filtered.forEach(skill => {
+                const item = document.createElement('div');
+                item.className = 'skill-dropdown-item';
+                const idx = skill.name.toLowerCase().indexOf(trimmed.toLowerCase());
+                item.innerHTML = idx >= 0
+                    ? skill.name.slice(0, idx) + `<strong>${skill.name.slice(idx, idx + trimmed.length)}</strong>` + skill.name.slice(idx + trimmed.length)
+                    : skill.name;
+                item.addEventListener('mousedown', e => { e.preventDefault(); attachSkill(skill.id, skill.name); });
+                addDropdown.appendChild(item);
+            });
+
+            const exact = items.find(s => s.name.toLowerCase() === trimmed.toLowerCase());
+            if (!exact && trimmed.length > 1) {
+                const item = document.createElement('div');
+                item.className = 'skill-dropdown-item';
+                item.innerHTML = `<span>Add "<strong>${trimmed}</strong>"</span><span class="new-badge">+ New</span>`;
+                item.addEventListener('mousedown', e => { e.preventDefault(); createAndAttach(trimmed); });
+                addDropdown.appendChild(item);
+            }
+
+            addDropdown.classList.toggle('open', addDropdown.children.length > 0);
+        }
+
+        async function attachSkill(skillId, skillName) {
+            try {
+                const res = await fetch('/users/me/skills', {
+                    method: 'POST',
+                    headers: { ...authHeaders, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ skill_id: skillId }),
+                });
+                if (res.ok) {
+                    profileUser.skills.push({ id: skillId, name: skillName });
+                    renderSkills();
+                    addInput.value = '';
+                    addDropdown.classList.remove('open');
+                    showToast(`"${skillName}" added!`, 'success');
+                } else {
+                    const d = await res.json();
+                    showToast(d.detail || 'Could not add skill.', 'error');
+                }
+            } catch { showToast('Network error.', 'error'); }
+        }
+
+        async function createAndAttach(name) {
+            try {
+                const res = await fetch(`/skills/?name=${encodeURIComponent(name)}`, {
+                    method: 'POST', headers: authHeaders,
+                });
+                if (res.ok) {
+                    const skill = await res.json();
+                    await attachSkill(skill.id, skill.name);
+                }
+            } catch { showToast('Could not create skill.', 'error'); }
+        }
+
+        addInput.addEventListener('blur', () => setTimeout(() => addDropdown.classList.remove('open'), 150));
+        document.addEventListener('click', e => { if (!e.target.closest('.skill-picker')) addDropdown.classList.remove('open'); });
+
+        // ── PARTICLE CANVAS ────────────────────────────────────────
+        const canvas = document.getElementById('particle-canvas');
+        const ctx = canvas.getContext('2d');
+        let pts = [];
+        function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+        class P {
+            constructor() { this.reset(); }
+            reset() {
+                this.x = Math.random() * canvas.width; this.y = Math.random() * canvas.height;
+                this.vx = (Math.random() - .5) * .25; this.vy = (Math.random() - .5) * .25;
+                this.r = Math.random() * 1.2 + .3; this.a = Math.random() * .3 + .05;
+                this.c = Math.random() > .5 ? '124,58,237' : '6,182,212';
+            }
+            update() {
+                this.x += this.vx; this.y += this.vy;
+                if (this.x < 0 || this.x > canvas.width || this.y < 0 || this.y > canvas.height) this.reset();
+            }
+            draw() {
+                ctx.beginPath(); ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(${this.c},${this.a})`; ctx.fill();
+            }
+        }
+        resize();
+        pts = Array.from({ length: 60 }, () => new P());
+        (function loop() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            pts.forEach(p => { p.update(); p.draw(); });
+            requestAnimationFrame(loop);
+        })();
+        window.addEventListener('resize', resize);
+
+        // ── TOAST ─────────────────────────────────────────────────
+        window.showToast = (msg, type = 'info') => {
+            const icons = { success: '✅', error: '❌', info: 'ℹ️' };
+            const c = document.getElementById('toastContainer');
+            const t = document.createElement('div');
+            t.className = `toast ${type}`;
+            t.innerHTML = `<span class="toast-icon">${icons[type]}</span><span>${msg}</span>`;
+            c.appendChild(t);
+            setTimeout(() => { t.classList.add('removing'); setTimeout(() => t.remove(), 200); }, 3500);
+        };
+
+        window.deleteSkill = deleteSkill;
+        init();
+    </script>
+</body>
+
+</html>
