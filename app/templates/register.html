@@ -252,7 +252,9 @@
         // ── STEP 3: SKILL TYPE-AHEAD ───────────────────────────────
         const selectedSkills = new Map(); // id → name
         let debounceTimer;
+        let activeRequestId = 0; // cancel stale requests
         let dropdownHighlight = -1;
+        let pendingNewSkills = new Map(); // name → temp-id for new skills created during register
 
         const skillInput = document.getElementById('skillInput');
         const chipContainer = document.getElementById('chipContainer');
@@ -271,112 +273,151 @@
             const chip = document.createElement('span');
             chip.className = 'chip';
             chip.dataset.id = id;
-            chip.innerHTML = `${name} <button class="chip-remove" data-id="${id}" aria-label="Remove ${name}">✕</button>`;
+            chip.innerHTML = `${name} <button class="chip-remove" aria-label="Remove ${name}">✕</button>`;
             chip.querySelector('.chip-remove').addEventListener('click', (e) => {
                 e.stopPropagation();
                 selectedSkills.delete(id);
+                pendingNewSkills.delete(name);
                 chip.remove();
                 updateCounter();
             });
             chipContainer.insertBefore(chip, skillInput);
         }
 
-        function addSkill(id, name) {
+        function addSkill(id, name, isNew = false) {
             if (selectedSkills.has(id)) return;
             selectedSkills.set(id, name);
+            if (isNew) pendingNewSkills.set(name, id);
             renderChip(id, name);
             skillInput.value = '';
+            closeDropdown();
+            updateCounter();
+        }
+
+        function closeDropdown() {
             dropdown.classList.remove('open');
             dropdown.innerHTML = '';
             dropdownHighlight = -1;
-            updateCounter();
         }
 
         function buildDropdown(items, query) {
             dropdown.innerHTML = '';
             dropdownHighlight = -1;
 
-            if (!items.length && query.length > 1) {
-                const item = document.createElement('div');
-                item.className = 'skill-dropdown-item';
-                item.innerHTML = `<span>${query}</span><span class="new-badge">+ Create</span>`;
-                item.addEventListener('click', () => createNewSkill(query));
-                dropdown.appendChild(item);
-            }
+            const trimmed = query.trim();
 
+            // existing skills first
             items.forEach(skill => {
                 if (selectedSkills.has(skill.id)) return;
                 const item = document.createElement('div');
                 item.className = 'skill-dropdown-item';
-                item.textContent = skill.name;
-                item.addEventListener('click', () => addSkill(skill.id, skill.name));
+
+                // highlight matching portion
+                const idx = skill.name.toLowerCase().indexOf(trimmed.toLowerCase());
+                if (idx >= 0) {
+                    item.innerHTML =
+                        skill.name.slice(0, idx) +
+                        `<strong>${skill.name.slice(idx, idx + trimmed.length)}</strong>` +
+                        skill.name.slice(idx + trimmed.length);
+                } else {
+                    item.textContent = skill.name;
+                }
+
+                item.addEventListener('mousedown', (e) => {
+                    e.preventDefault(); // prevent input blur before click registers
+                    addSkill(skill.id, skill.name);
+                });
                 dropdown.appendChild(item);
             });
+
+            // "create new" option at bottom if no exact match
+            const exactMatch = items.find(s => s.name.toLowerCase() === trimmed.toLowerCase());
+            if (!exactMatch && trimmed.length > 1) {
+                const item = document.createElement('div');
+                item.className = 'skill-dropdown-item';
+                item.innerHTML = `<span>Add "<strong>${trimmed}</strong>"</span><span class="new-badge">+ New</span>`;
+                item.addEventListener('mousedown', (e) => {
+                    e.preventDefault();
+                    // generate a temporary ID — will be resolved server-side on submit
+                    const tempId = `new::${trimmed}`;
+                    addSkill(tempId, trimmed, true);
+                });
+                dropdown.appendChild(item);
+            }
 
             dropdown.classList.toggle('open', dropdown.children.length > 0);
         }
 
         async function searchSkills(q) {
+            const requestId = ++activeRequestId;
             try {
-                const res = await fetch(`/skills/search?q=${encodeURIComponent(q)}&limit=8`);
+                const res = await fetch(`/skills/search?q=${encodeURIComponent(q)}&limit=10`);
+                if (requestId !== activeRequestId) return; // stale — discard
                 const data = await res.json();
                 buildDropdown(data, q);
-            } catch { dropdown.classList.remove('open'); }
-        }
-
-        async function createNewSkill(name) {
-            const token = localStorage.getItem('sc-token');
-            if (!token) {
-                showToast('Please sign in first to create new skills.', 'error');
-                return;
+            } catch {
+                if (requestId !== activeRequestId) return;
+                closeDropdown();
             }
-            try {
-                const res = await fetch(`/skills/?name=${encodeURIComponent(name)}`, {
-                    method: 'POST',
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                if (res.ok) {
-                    const skill = await res.json();
-                    addSkill(skill.id, skill.name);
-                    showToast(`"${skill.name}" created and added!`, 'success');
-                }
-            } catch { showToast('Could not create skill. Try again.', 'error'); }
         }
 
         skillInput.addEventListener('input', () => {
             const q = skillInput.value.trim();
             clearTimeout(debounceTimer);
-            if (q.length < 1) { dropdown.classList.remove('open'); return; }
-            debounceTimer = setTimeout(() => searchSkills(q), 220);
+            if (q.length < 2) { closeDropdown(); return; }
+            // show loading hint immediately
+            dropdown.innerHTML = `<div class="skill-dropdown-item text-muted" style="cursor:default;">
+    <span class="spinner" style="width:12px;height:12px;margin-right:6px;"></span>Searching…
+  </div>`;
+            dropdown.classList.add('open');
+            debounceTimer = setTimeout(() => searchSkills(q), 280);
         });
 
         skillInput.addEventListener('keydown', (e) => {
-            const items = dropdown.querySelectorAll('.skill-dropdown-item');
+            const items = [...dropdown.querySelectorAll('.skill-dropdown-item:not([style*="cursor:default"])')];
+            if (!items.length) return;
+
             if (e.key === 'ArrowDown') {
                 e.preventDefault();
                 dropdownHighlight = Math.min(dropdownHighlight + 1, items.length - 1);
                 items.forEach((el, i) => el.classList.toggle('highlighted', i === dropdownHighlight));
+                items[dropdownHighlight]?.scrollIntoView({ block: 'nearest' });
             } else if (e.key === 'ArrowUp') {
                 e.preventDefault();
                 dropdownHighlight = Math.max(dropdownHighlight - 1, 0);
                 items.forEach((el, i) => el.classList.toggle('highlighted', i === dropdownHighlight));
+                items[dropdownHighlight]?.scrollIntoView({ block: 'nearest' });
             } else if (e.key === 'Enter') {
                 e.preventDefault();
                 if (dropdownHighlight >= 0 && items[dropdownHighlight]) {
-                    items[dropdownHighlight].click();
+                    items[dropdownHighlight].dispatchEvent(new MouseEvent('mousedown'));
+                } else if (skillInput.value.trim().length > 1) {
+                    // no highlight — add as new
+                    const trimmed = skillInput.value.trim();
+                    const tempId = `new::${trimmed}`;
+                    addSkill(tempId, trimmed, true);
                 }
             } else if (e.key === 'Escape') {
-                dropdown.classList.remove('open');
+                closeDropdown();
             }
         });
 
+        skillInput.addEventListener('blur', () => {
+            // delay so mousedown on dropdown items fires first
+            setTimeout(closeDropdown, 150);
+        });
+
         document.addEventListener('click', (e) => {
-            if (!e.target.closest('.skill-picker')) dropdown.classList.remove('open');
+            if (!e.target.closest('.skill-picker')) closeDropdown();
         });
 
         // ── SUBMIT ─────────────────────────────────────────────────
         document.getElementById('submitBtn').addEventListener('click', async () => {
             clearErr('step3Error');
+
+            // separate existing skill IDs from new skill names
+            const existingIds = [...selectedSkills.keys()].filter(id => !id.startsWith('new::'));
+            const newSkillNames = [...pendingNewSkills.keys()];
 
             const payload = {
                 full_name: document.getElementById('fullName').value.trim(),
@@ -384,7 +425,8 @@
                 password: document.getElementById('password').value,
                 branch: document.getElementById('branch').value,
                 batch: selectedBatch,
-                skill_ids: [...selectedSkills.keys()],
+                skill_ids: existingIds,
+                new_skill_names: newSkillNames,
             };
 
             submitBtn.classList.add('loading');
@@ -428,7 +470,7 @@
                     showErr('step3Error', '❌ ' + msg);
                 }
             } catch (err) {
-                showErr('step3Error', `❌ Network error: ${err.message}. Check console.`);
+                showErr('step3Error', `❌ Network error: ${err.message}`);
                 console.error('Registration error:', err);
             } finally {
                 submitBtn.classList.remove('loading');
@@ -436,7 +478,6 @@
                 submitBtn.disabled = selectedSkills.size < 5;
             }
         });
-
         // ── PARTICLE CANVAS ────────────────────────────────────────
         const canvas = document.getElementById('particle-canvas');
         const ctx = canvas.getContext('2d');

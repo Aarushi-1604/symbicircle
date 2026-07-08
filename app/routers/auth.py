@@ -3,7 +3,9 @@ from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
-
+from sqlalchemy import select, func
+import uuid
+from app.models import User, UserSkill, Skill, SkillAlias
 from app.database import get_db
 from app.models import User, UserSkill, Skill
 from app.schemas import RegisterRequest, LoginRequest, TokenResponse, UserOut
@@ -40,9 +42,15 @@ async def get_current_user(
         raise credentials_exception
     return user
 
-
 @router.post("/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
 async def register(payload: RegisterRequest, db: AsyncSession = Depends(get_db)):
+    # enforce minimum 5 skills total
+    if payload.total_skills() < 5:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="A minimum of 5 skills is required to register.",
+        )
+
     # duplicate email check
     existing = await db.execute(select(User).where(User.email == payload.email))
     if existing.scalar_one_or_none():
@@ -51,18 +59,7 @@ async def register(payload: RegisterRequest, db: AsyncSession = Depends(get_db))
             detail="An account with this email already exists.",
         )
 
-    # validate all skill_ids exist
-    skill_results = await db.execute(
-        select(Skill).where(Skill.id.in_(payload.skill_ids))
-    )
-    found_skills = skill_results.scalars().all()
-    if len(found_skills) != len(payload.skill_ids):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="One or more skill IDs are invalid.",
-        )
-
-    # create user
+    # create user first so we have user.id for skill creation
     user = User(
         full_name=payload.full_name,
         email=payload.email,
@@ -71,14 +68,62 @@ async def register(payload: RegisterRequest, db: AsyncSession = Depends(get_db))
         batch=payload.batch,
     )
     db.add(user)
-    await db.flush()  # get user.id before committing
+    await db.flush()
 
-    # attach skills
-    for skill in found_skills:
+    # validate existing skill_ids
+    found_skills = []
+    if payload.skill_ids:
+        skill_results = await db.execute(
+            select(Skill).where(Skill.id.in_(payload.skill_ids))
+        )
+        found_skills = skill_results.scalars().all()
+        if len(found_skills) != len(payload.skill_ids):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="One or more skill IDs are invalid.",
+            )
+
+    # create brand new skills inline — no auth needed since we own the transaction
+    new_skills = []
+    for name in payload.new_skill_names:
+        name_clean = name.strip()
+        if not name_clean:
+            continue
+        # check if skill already exists (case-insensitive)
+        existing_skill = await db.execute(
+            select(Skill).where(func.lower(Skill.name) == name_clean.lower())
+        )
+        skill = existing_skill.scalar_one_or_none()
+        if not skill:
+            # check aliases too
+            alias_check = await db.execute(
+                select(SkillAlias).where(
+                    func.lower(SkillAlias.alias_text) == name_clean.lower()
+                )
+            )
+            alias = alias_check.scalar_one_or_none()
+            if alias:
+                skill = await db.get(Skill, alias.canonical_skill_id)
+            else:
+                skill = Skill(
+                    id=str(uuid.uuid4()),
+                    name=name_clean,
+                    created_by=user.id,
+                )
+                db.add(skill)
+                await db.flush()
+        new_skills.append(skill)
+
+    # attach all skills
+    all_skills = found_skills + new_skills
+    seen_skill_ids = set()
+    for skill in all_skills:
+        if skill.id in seen_skill_ids:
+            continue
+        seen_skill_ids.add(skill.id)
         db.add(UserSkill(user_id=user.id, skill_id=skill.id))
 
     await db.commit()
-    await db.refresh(user)
 
     # reload with skills for response
     result = await db.execute(
@@ -89,6 +134,7 @@ async def register(payload: RegisterRequest, db: AsyncSession = Depends(get_db))
     user = result.scalar_one()
     user.skills = [us.skill for us in user.user_skills]
     return user
+
 
 
 @router.post("/login", response_model=TokenResponse)
