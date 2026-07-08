@@ -26,7 +26,8 @@ class RegisterRequest(BaseModel):
     password: str
     branch: str
     batch: str
-    skill_ids: List[str]
+    skill_ids: List[str] = []
+    new_skill_names: List[str] = []
 
     @field_validator("email")
     @classmethod
@@ -52,10 +53,10 @@ class RegisterRequest(BaseModel):
     @field_validator("skill_ids")
     @classmethod
     def minimum_five_skills(cls, v: List[str]) -> List[str]:
-        if len(v) < 5:
-            raise ValueError("A minimum of 5 skills is required to register.")
         return v
 
+    def total_skills(self) -> int:
+        return len(self.skill_ids) + len(self.new_skill_names)
 
 class LoginRequest(BaseModel):
     email: EmailStr
