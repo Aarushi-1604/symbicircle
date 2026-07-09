@@ -33,6 +33,9 @@ class User(Base):
         "UserSkill", back_populates="user", cascade="all, delete-orphan"
     )
 
+    # usernames
+    username: Mapped[Optional[str]] = mapped_column(String(120), unique=True, nullable=True, index = True)
+
 
 class Skill(Base):
     __tablename__ = "skills"
