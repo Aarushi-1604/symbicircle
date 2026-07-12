@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dashboard — SymbiCircle</title>
+    <link rel="stylesheet" href="/static/css/style.css" />
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>" />
+</head>
+
+<body>
+
+    <canvas id="particle-canvas"></canvas>
+    <div class="bg-orbs">
+        <div class="orb-mid"></div>
+    </div>
+
+    <nav class="navbar">
+        <a href="/" class="navbar-brand">⚡ SymbiCircle</a>
+        <div class="navbar-nav">
+            <a href="#" class="nav-link" id="myProfileLink">My Profile</a>
+            <button class="btn btn-ghost btn-sm" id="logoutBtn">Sign out</button>
+            <button class="theme-toggle" id="themeToggle">🌙</button>
+        </div>
+    </nav>
+
+    <div class="page-wrapper">
+        <div
+            style="display:grid;grid-template-columns:280px 1fr;gap:1.5rem;max-width:1300px;margin:0 auto;padding:0 1.5rem;min-height:calc(100vh - var(--nav-height));padding-top:var(--nav-height);">
+
+            <!-- SIDEBAR -->
+            <aside
+                style="padding:1.5rem 1rem 1.5rem 0;position:sticky;top:var(--nav-height);height:calc(100vh - var(--nav-height));overflow-y:auto;">
+
+                <p class="text-muted"
+                    style="font-size:0.75rem;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:0.75rem;">
+                    Filters</p>
+
+                <div class="form-group">
+                    <label class="form-label">Branch</label>
+                    <select class="form-select" id="filterBranch">
+                        <option value="">All Branches</option>
+                        <option value="AIML">AIML</option>
+                        <option value="CSE">CSE</option>
+                        <option value="ENTC">ENTC</option>
+                        <option value="RA">RA</option>
+                        <option value="CIVIL">CIVIL</option>
+                        <option value="MECH">MECH</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Batch</label>
+                    <div style="display:flex;flex-direction:column;gap:0.4rem;">
+                        <label
+                            style="display:flex;align-items:center;gap:0.5rem;font-size:0.875rem;cursor:pointer;color:var(--text-secondary);">
+                            <input type="checkbox" value="2023-27" class="batch-check" /> 2023–27
+                        </label>
+                        <label
+                            style="display:flex;align-items:center;gap:0.5rem;font-size:0.875rem;cursor:pointer;color:var(--text-secondary);">
+                            <input type="checkbox" value="2024-28" class="batch-check" /> 2024–28
+                        </label>
+                        <label
+                            style="display:flex;align-items:center;gap:0.5rem;font-size:0.875rem;cursor:pointer;color:var(--text-secondary);">
+                            <input type="checkbox" value="2025-29" class="batch-check" /> 2025–29
+                        </label>
+                        <label
+                            style="display:flex;align-items:center;gap:0.5rem;font-size:0.875rem;cursor:pointer;color:var(--text-secondary);">
+                            <input type="checkbox" value="2026-30" class="batch-check" /> 2026–30
+                        </label>
+                    </div>
+                </div>
+
+                <button class="btn btn-ghost btn-sm w-full" style="margin-top:1rem;" id="clearFilters">Clear
+                    Filters</button>
+
+                <div class="divider"></div>
+                <div id="meCard"></div>
+            </aside>
+
+            <!-- MAIN -->
+            <main style="padding:1.5rem 0;overflow-y:auto;">
+
+                <h1 class="font-primary" style="font-size:1.6rem;font-weight:700;margin-bottom:0.75rem;">
+                    Find your <span class="text-gradient">campus people</span>
+                </h1>
+
+                <div class="search-bar" style="margin-bottom:0.75rem;">
+                    <span class="search-icon">🔍</span>
+                    <input class="search-bar-input" type="text" id="searchInput"
+                        placeholder="Search by skill — Python, NLP, CAD, React…" autocomplete="off" />
+                    <button class="btn btn-primary btn-sm" id="searchBtn">Search</button>
+                </div>
+
+                <div id="activeSearchChips" style="display:flex;flex-wrap:wrap;gap:0.5rem;margin-bottom:1rem;"></div>
+
+                <div id="resultsHeader" style="display:none;margin-bottom:1rem;">
+                    <p class="text-secondary" style="font-size:0.875rem;" id="resultsCount"></p>
+                </div>
+
+                <!-- Exact results -->
+                <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1.25rem;"
+                    id="resultsGrid"></div>
+
+                <!-- AI similar section -->
+                <div id="similarSection" style="display:none;">
+                    <div class="similar-section-break" style="margin:2.5rem 0 1.5rem;">
+                        <span style="font-size:1.1rem;">✨</span>
+                        <span class="similar-section-break-label">Others with similar skills</span>
+                        <span class="text-muted" style="font-size:0.78rem;margin-left:auto;">AI-powered
+                            suggestions</span>
+                    </div>
+                    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1.25rem;"
+                        id="similarGrid"></div>
+                </div>
+
+                <!-- Empty state -->
+                <div class="empty-state" id="emptyState">
+                    <div class="empty-state-icon">🔍</div>
+                    <div class="empty-state-title">Search for a skill to get started</div>
+                    <div class="empty-state-text">Try "Python", "Machine Learning", "CAD", or any skill your project
+                        needs.</div>
+                </div>
+
+                <!-- Loading skeleton -->
+                <div id="loadingState" style="display:none;">
+                    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1.25rem;"
+                        id="skeletonGrid"></div>
+                </div>
+
+            </main>
+        </div>
+    </div>
+
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script>
+        // ── THEME ──────────────────────────────────────────────────
+        const html = document.documentElement;
+        const themeBtn = document.getElementById('themeToggle');
+        const savedTheme = localStorage.getItem('sc-theme') || 'dark';
+        html.setAttribute('data-theme', savedTheme);
+        themeBtn.textContent = savedTheme === 'dark' ? '🌙' : '☀️';
+        themeBtn.addEventListener('click', () => {
+            const next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+            html.setAttribute('data-theme', next);
+            localStorage.setItem('sc-theme', next);
+            themeBtn.textContent = next === 'dark' ? '🌙' : '☀️';
+        });
+
+        // ── AUTH GUARD ─────────────────────────────────────────────
+        const token = localStorage.getItem('sc-token');
+        if (!token) window.location.href = '/login';
+        const authHeaders = { 'Authorization': `Bearer ${token}` };
+
+        // ── LOGOUT ─────────────────────────────────────────────────
+        document.getElementById('logoutBtn').addEventListener('click', () => {
+            localStorage.removeItem('sc-token');
+            window.location.href = '/';
+        });
+
+        // ── BUILD SKELETON ─────────────────────────────────────────
+        const skeletonGrid = document.getElementById('skeletonGrid');
+        for (let i = 0; i < 6; i++) {
+            skeletonGrid.innerHTML += `
+    <div class="card" style="pointer-events:none;">
+      <div style="display:flex;gap:0.75rem;align-items:center;margin-bottom:1rem;">
+        <div class="skeleton" style="width:48px;height:48px;border-radius:50%;flex-shrink:0;"></div>
+        <div style="flex:1;">
+          <div class="skeleton skeleton-title"></div>
+          <div class="skeleton skeleton-text" style="width:40%;"></div>
+        </div>
+      </div>
+      <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+        <div class="skeleton skeleton-chip"></div>
+        <div class="skeleton skeleton-chip"></div>
+        <div class="skeleton skeleton-chip"></div>
+      </div>
+    </div>`;
+        }
+
+        // ── LOAD CURRENT USER ──────────────────────────────────────
+        let currentUser = null;
+
+        async function loadMe() {
+            try {
+                const res = await fetch('/auth/me', { headers: authHeaders });
+                if (!res.ok) { localStorage.removeItem('sc-token'); window.location.href = '/login'; return; }
+                currentUser = await res.json();
+                document.getElementById('myProfileLink').href = `/profile/${currentUser.username || currentUser.id}`;
+                const initials = currentUser.full_name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+                document.getElementById('meCard').innerHTML = `
+      <div class="card card-sm" style="cursor:pointer;" onclick="window.location.href='/profile/${currentUser.username || currentUser.id}'">
+        <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:0.75rem;">
+          <div style="width:38px;height:38px;border-radius:50%;background:var(--grad-primary);
+               display:flex;align-items:center;justify-content:center;
+               font-weight:700;color:white;font-size:0.9rem;flex-shrink:0;">
+            ${initials}
+          </div>
+          <div>
+            <div style="font-weight:600;font-size:0.875rem;">${currentUser.full_name}</div>
+            <div class="text-muted" style="font-size:0.75rem;">${currentUser.branch} · ${currentUser.batch}</div>
+          </div>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:0.4rem;">
+          ${(currentUser.skills || []).slice(0, 3).map(s =>
+                    `<span class="chip" style="font-size:0.7rem;padding:0.2rem 0.55rem;">${s.name}</span>`
+                ).join('')}
+          ${currentUser.skills.length > 3
+                        ? `<span class="chip chip-cyan" style="font-size:0.7rem;">+${currentUser.skills.length - 3}</span>`
+                        : ''}
+        </div>
+      </div>`;
+            } catch { localStorage.removeItem('sc-token'); window.location.href = '/login'; }
+        }
+        loadMe();
+
+        // ── SEARCH STATE ───────────────────────────────────────────
+        let activeSkillTags = [];
+        let searchDebounce;
+
+        const searchInput = document.getElementById('searchInput');
+        const searchBtn = document.getElementById('searchBtn');
+        const activeChipsCont = document.getElementById('activeSearchChips');
+        const resultsGrid = document.getElementById('resultsGrid');
+        const similarGrid = document.getElementById('similarGrid');
+        const similarSection = document.getElementById('similarSection');
+        const emptyState = document.getElementById('emptyState');
+        const loadingState = document.getElementById('loadingState');
+        const resultsHeader = document.getElementById('resultsHeader');
+        const resultsCount = document.getElementById('resultsCount');
+
+        function addSearchTag(value) {
+            const tag = value.trim();
+            if (!tag || activeSkillTags.includes(tag.toLowerCase())) return;
+            activeSkillTags.push(tag);
+            renderSearchChips();
+            searchInput.value = '';
+            runSearch();
+        }
+
+        function removeSearchTag(tag) {
+            activeSkillTags = activeSkillTags.filter(t => t !== tag);
+            renderSearchChips();
+            if (!activeSkillTags.length) showEmpty();
+            else runSearch();
+        }
+
+        function renderSearchChips() {
+            activeChipsCont.innerHTML = activeSkillTags.map(tag => `
+    <span class="chip chip-cyan">
+      ${tag}
+      <button class="chip-remove" onclick="removeSearchTag('${tag}')">✕</button>
+    </span>`).join('');
+        }
+
+        searchBtn.addEventListener('click', () => {
+            if (searchInput.value.trim()) addSearchTag(searchInput.value);
+            else if (activeSkillTags.length) runSearch();
+        });
+
+        searchInput.addEventListener('keydown', e => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                if (searchInput.value.trim()) addSearchTag(searchInput.value);
+                else if (activeSkillTags.length) runSearch();
+            }
+        });
+
+        document.getElementById('filterBranch').addEventListener('change', () => {
+            if (activeSkillTags.length) runSearch();
+        });
+        document.querySelectorAll('.batch-check').forEach(cb => {
+            cb.addEventListener('change', () => { if (activeSkillTags.length) runSearch(); });
+        });
+        document.getElementById('clearFilters').addEventListener('click', () => {
+            document.getElementById('filterBranch').value = '';
+            document.querySelectorAll('.batch-check').forEach(cb => cb.checked = false);
+            if (activeSkillTags.length) runSearch();
+        });
+
+        // ── SHOW STATES ────────────────────────────────────────────
+        function showEmpty(title, text) {
+            emptyState.style.display = 'block';
+            loadingState.style.display = 'none';
+            resultsGrid.innerHTML = '';
+            similarGrid.innerHTML = '';
+            similarSection.style.display = 'none';
+            resultsHeader.style.display = 'none';
+            if (title) emptyState.querySelector('.empty-state-title').textContent = title;
+            if (text) emptyState.querySelector('.empty-state-text').textContent = text;
+        }
+
+        function showLoading() {
+            loadingState.style.display = 'block';
+            emptyState.style.display = 'none';
+            resultsGrid.innerHTML = '';
+            similarGrid.innerHTML = '';
+            similarSection.style.display = 'none';
+            resultsHeader.style.display = 'none';
+        }
+
+        // ── SEARCH ─────────────────────────────────────────────────
+        async function runSearch() {
+            if (!activeSkillTags.length) { showEmpty(); return; }
+            showLoading();
+
+            const branch = document.getElementById('filterBranch').value;
+            const batches = [...document.querySelectorAll('.batch-check:checked')].map(cb => cb.value);
+
+            const params = new URLSearchParams();
+            activeSkillTags.forEach(q => params.append('skills', q));
+            if (branch) params.append('branch', branch);
+            batches.forEach(b => params.append('batch', b));
+
+            try {
+                const res = await fetch(`/search?${params}`, { headers: authHeaders });
+                const data = await res.json();
+
+                loadingState.style.display = 'none';
+                resultsHeader.style.display = 'block';
+
+                const exact = data.exact || [];
+                const similar = data.similar || [];
+
+                resultsCount.textContent = `${exact.length} exact match${exact.length !== 1 ? 'es' : ''}`;
+
+                if (!exact.length && !similar.length) {
+                    showEmpty('No results found',
+                        `No one on campus has listed "${activeSkillTags.join(', ')}" yet. Try a related term.`);
+                    return;
+                }
+
+                emptyState.style.display = 'none';
+                resultsGrid.innerHTML = exact.map(u => profileCard(u)).join('');
+
+                if (similar.length) {
+                    similarGrid.innerHTML = similar.map(u => profileCard(u)).join('');
+                    similarSection.style.display = 'block';
+                } else {
+                    similarSection.style.display = 'none';
+                }
+
+                attachTilt();
+            } catch (err) {
+                loadingState.style.display = 'none';
+                showToast('Search failed. Please try again.', 'error');
+                console.error(err);
+            }
+        }
+
+        // ── PROFILE CARD ───────────────────────────────────────────
+        function profileCard(user) {
+            const slug = user.username || user.id;
+            const initials = user.full_name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+            const chips = (user.skills || []).slice(0, 5).map(s =>
+                `<span class="chip" style="font-size:0.75rem;">${s.name}</span>`).join('');
+            const extra = user.skills.length > 5
+                ? `<span class="chip chip-cyan" style="font-size:0.75rem;">+${user.skills.length - 5}</span>` : '';
+
+            return `
+    <div class="profile-card" onclick="window.location.href='/profile/${slug}'">
+      <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:1rem;">
+        <div style="width:52px;height:52px;border-radius:50%;background:var(--grad-primary);
+             display:flex;align-items:center;justify-content:center;
+             font-weight:700;color:white;font-size:1.2rem;flex-shrink:0;">
+          ${initials}
+        </div>
+        <div>
+          <div style="font-family:var(--font-primary);font-size:1.05rem;font-weight:600;">${user.full_name}</div>
+          <div class="text-muted" style="font-size:0.82rem;">${user.branch} · ${user.batch}</div>
+        </div>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:0.4rem;margin-bottom:1.25rem;">${chips}${extra}</div>
+      <button class="btn btn-primary btn-sm w-full"
+        onclick="event.stopPropagation();window.location.href='/profile/${slug}'">
+        View Profile →
+      </button>
+    </div>`;
+        }
+
+        // ── 3D TILT ────────────────────────────────────────────────
+        function attachTilt() {
+            document.querySelectorAll('.profile-card').forEach(card => {
+                card.addEventListener('mousemove', e => {
+                    const r = card.getBoundingClientRect();
+                    const x = e.clientX - r.left, y = e.clientY - r.top;
+                    const rx = ((y - r.height / 2) / r.height / 2) * -8;
+                    const ry = ((x - r.width / 2) / r.width / 2) * 8;
+                    card.style.transform = `perspective(600px) rotateX(${rx}deg) rotateY(${ry}deg) translateY(-4px)`;
+                });
+                card.addEventListener('mouseleave', () => {
+                    card.style.transform = 'perspective(600px) rotateX(0) rotateY(0) translateY(0)';
+                });
+            });
+        }
+
+        // ── PARTICLE CANVAS ────────────────────────────────────────
+        const canvas = document.getElementById('particle-canvas');
+        const ctx = canvas.getContext('2d');
+        let pts = [];
+        function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+        class P {
+            constructor() { this.reset(); }
+            reset() {
+                this.x = Math.random() * canvas.width; this.y = Math.random() * canvas.height;
+                this.vx = (Math.random() - .5) * .25; this.vy = (Math.random() - .5) * .25;
+                this.r = Math.random() * 1.2 + .3; this.a = Math.random() * .3 + .05;
+                this.c = Math.random() > .5 ? '124,58,237' : '6,182,212';
+            }
+            update() {
+                this.x += this.vx; this.y += this.vy;
+                if (this.x < 0 || this.x > canvas.width || this.y < 0 || this.y > canvas.height) this.reset();
+            }
+            draw() {
+                ctx.beginPath(); ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(${this.c},${this.a})`; ctx.fill();
+            }
+        }
+        resize();
+        pts = Array.from({ length: 60 }, () => new P());
+        (function loop() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            pts.forEach(p => { p.update(); p.draw(); });
+            requestAnimationFrame(loop);
+        })();
+        window.addEventListener('resize', resize);
+
+        // ── TOAST ─────────────────────────────────────────────────
+        window.showToast = (msg, type = 'info') => {
+            const icons = { success: '✅', error: '❌', info: 'ℹ️' };
+            const c = document.getElementById('toastContainer');
+            const t = document.createElement('div');
+            t.className = `toast ${type}`;
+            t.innerHTML = `<span class="toast-icon">${icons[type]}</span><span>${msg}</span>`;
+            c.appendChild(t);
+            setTimeout(() => { t.classList.add('removing'); setTimeout(() => t.remove(), 200); }, 3500);
+        };
+
+        window.removeSearchTag = removeSearchTag;
+    </script>
+</body>
+
+</html>

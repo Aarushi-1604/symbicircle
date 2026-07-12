@@ -157,6 +157,7 @@ async def search_users(
     def serialize(user: User) -> dict:
         return {
             "id":         user.id,
+            "username": user.username,
             "full_name":  user.full_name,
             "email":      user.email,
             "branch":     user.branch,

@@ -56,8 +56,8 @@ async def dashboard_page(request: Request):
 
 @app.get("/profile/me", response_class=HTMLResponse)
 async def own_profile(request: Request):
-    return templates.TemplateResponse("profile.html", {"request": request, "user_id": "me"})
+    return templates.TemplateResponse("profile.html", {"request": request})
 
-@app.get("/profile/{user_id}", response_class=HTMLResponse)
-async def profile_page(request: Request, user_id: str):
-    return templates.TemplateResponse("profile.html", {"request": request, "user_id": user_id})
+@app.get("/profile/{username}", response_class=HTMLResponse)
+async def profile_page(request: Request, username: str):
+    return templates.TemplateResponse("profile.html", {"request": request})
