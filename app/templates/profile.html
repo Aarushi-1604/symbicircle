@@ -189,7 +189,8 @@
                 } else {
                     // someone else's slug
                     isOwner = false;
-                    endpoint = `/users/by-username/${urlSlug}`;
+                    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(urlSlug);
+                    endpoint = isUUID ? `/users/${urlSlug}` : `/users/by-username/${urlSlug}`;
                 }
 
                 const profileRes = await fetch(endpoint, { headers: authHeaders });
@@ -210,6 +211,10 @@
         }
 
         function renderProfile() {
+            // rewrite UUID to slug if available
+            if (profileUser.username && !window.location.pathname.includes(profileUser.username)) {
+                window.history.replaceState(null, '', `/profile/${profileUser.username}`);
+            }
             document.getElementById('profileLoading').style.display = 'none';
             document.getElementById('profileContent').style.display = 'block';
 

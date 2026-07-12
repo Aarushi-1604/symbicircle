@@ -353,8 +353,8 @@
 
         // ── PROFILE CARD ───────────────────────────────────────────
         function profileCard(user) {
-            const initials = user.full_name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
             const slug = user.username || user.id;
+            const initials = user.full_name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
             const chips = (user.skills || []).slice(0, 5).map(s =>
                 `<span class="chip" style="font-size:0.75rem;">${s.name}</span>`).join('');
             const extra = user.skills.length > 5
