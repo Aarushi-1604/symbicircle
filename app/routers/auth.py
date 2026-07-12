@@ -10,6 +10,7 @@ from app.database import get_db
 from app.models import User, UserSkill, Skill
 from app.schemas import RegisterRequest, LoginRequest, TokenResponse, UserOut
 from app.services.auth import hash_password, verify_password, create_access_token, decode_access_token
+from app.services.slugify import generate_username
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
@@ -69,7 +70,8 @@ async def register(payload: RegisterRequest, db: AsyncSession = Depends(get_db))
     )
     db.add(user)
     await db.flush()
-
+    user.username - generate_username(user.full_name, user.id) #for linkedin-style slug
+    
     # validate existing skill_ids
     found_skills = []
     if payload.skill_ids:

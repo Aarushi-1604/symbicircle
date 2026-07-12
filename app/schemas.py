@@ -70,6 +70,7 @@ class TokenResponse(BaseModel):
 
 class UserOut(BaseModel):
     id: str
+    username: Optional[str] = None
     full_name: str
     email: str
     branch: str

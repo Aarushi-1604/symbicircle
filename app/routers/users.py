@@ -29,6 +29,22 @@ async def get_my_profile(
     user.skills = [us.skill for us in user.user_skills]
     return user
 
+@router.get("/by-username/{username}", response_model=UserOut)
+async def get_user_by_username(
+    username: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    result = await db.execute(
+        select(User)
+        .options(selectinload(User.user_skills).selectinload(UserSkill.skill))
+        .where(User.username == username, User.is_active == True)
+    )
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found.")
+    user.skills = [us.skill for us in user.user_skills]
+    return user
 
 @router.get("/{user_id}", response_model=UserOut)
 async def get_user_profile(

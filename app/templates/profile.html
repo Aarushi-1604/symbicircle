@@ -155,9 +155,9 @@
             window.location.href = '/';
         });
 
-        // ── RESOLVE USER ID ────────────────────────────────────────
+        // ── RESOLVE SLUG FROM URL ──────────────────────────────────
         const pathParts = window.location.pathname.split('/').filter(Boolean);
-        const urlUserId = pathParts[pathParts.length - 1];
+        const urlSlug = pathParts[pathParts.length - 1]; // 'me' or 'aarushi-sharma-a3f2'
 
         let currentUser = null;
         let profileUser = null;
@@ -166,13 +166,32 @@
         async function init() {
             try {
                 const meRes = await fetch('/auth/me', { headers: authHeaders });
-                if (!meRes.ok) { localStorage.removeItem('sc-token'); window.location.href = '/login'; return; }
+                if (!meRes.ok) {
+                    localStorage.removeItem('sc-token');
+                    window.location.href = '/login';
+                    return;
+                }
                 currentUser = await meRes.json();
 
-                const targetId = (urlUserId === 'me') ? currentUser.id : urlUserId;
-                isOwner = (targetId === currentUser.id);
+                let endpoint;
 
-                const endpoint = isOwner ? '/users/me' : `/users/${targetId}`;
+                if (urlSlug === 'me') {
+                    // /profile/me → always own profile, redirect to pretty URL
+                    isOwner = true;
+                    endpoint = '/users/me';
+                    if (currentUser.username) {
+                        window.history.replaceState(null, '', `/profile/${currentUser.username}`);
+                    }
+                } else if (currentUser.username && urlSlug === currentUser.username) {
+                    // slug matches current user → own profile
+                    isOwner = true;
+                    endpoint = '/users/me';
+                } else {
+                    // someone else's slug
+                    isOwner = false;
+                    endpoint = `/users/by-username/${urlSlug}`;
+                }
+
                 const profileRes = await fetch(endpoint, { headers: authHeaders });
 
                 if (!profileRes.ok) {
@@ -183,6 +202,7 @@
 
                 profileUser = await profileRes.json();
                 renderProfile();
+
             } catch {
                 document.getElementById('profileLoading').style.display = 'none';
                 document.getElementById('profileError').style.display = 'block';
