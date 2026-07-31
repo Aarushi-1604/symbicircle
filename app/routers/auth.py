@@ -70,7 +70,7 @@ async def register(payload: RegisterRequest, db: AsyncSession = Depends(get_db))
     )
     db.add(user)
     await db.flush()
-    user.username - generate_username(user.full_name, user.id) #for linkedin-style slug
+    user.username = generate_username(user.full_name, user.id) #for linkedin-style slug
     
     # validate existing skill_ids
     found_skills = []
