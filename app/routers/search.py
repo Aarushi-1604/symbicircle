@@ -4,27 +4,59 @@ from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 from app.database import get_db
 from app.models import User, UserSkill, Skill, SkillAlias
-from app.schemas import UserOut
 from app.routers.auth import get_current_user
 from typing import List, Optional
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
-import numpy as np
 
 router = APIRouter(prefix="/search", tags=["search"])
 
+# Branch-aware related skill clusters
+# When a niche skill is searched, we expand using its cluster
+SKILL_CLUSTERS = {
+    # Robotics / RA cluster
+    "slam":             ["robotics", "ros", "motion planning", "path planning", "sensor fusion", "computer vision", "embedded systems", "arduino", "raspberry pi"],
+    "ros":              ["robotics", "slam", "motion planning", "path planning", "sensor fusion", "python", "c++"],
+    "path planning":    ["robotics", "ros", "slam", "motion planning", "sensor fusion"],
+    "motion planning":  ["robotics", "ros", "slam", "path planning"],
+    "sensor fusion":    ["robotics", "ros", "slam", "computer vision", "embedded systems"],
+
+    # ENTC cluster
+    "fpga":             ["vlsi", "embedded systems", "c", "signal processing", "arm architecture", "microcontrollers"],
+    "vlsi":             ["fpga", "embedded systems", "signal processing", "pcb design"],
+    "pcb design":       ["vlsi", "embedded systems", "altium designer", "proteus", "circuit design"],
+    "arm architecture": ["embedded systems", "microcontrollers", "fpga", "c", "c++"],
+
+    # CIVIL cluster
+    "staad pro":        ["structural analysis", "etabs", "autocad", "revit", "concrete design", "steel design"],
+    "etabs":            ["structural analysis", "staad pro", "autocad", "revit", "earthquake engineering"],
+    "revit":            ["autocad", "bim", "staad pro", "etabs", "construction management"],
+
+    # MECH cluster
+    "ansys":            ["fea analysis", "solidworks", "catia", "matlab", "thermodynamics", "fluid mechanics"],
+    "catia":            ["solidworks", "ansys", "autocad", "cam", "cnc programming"],
+    "cnc programming":  ["cam", "catia", "solidworks", "manufacturing processes", "machine design"],
+    "fea analysis":     ["ansys", "solidworks", "matlab", "thermodynamics", "machine design"],
+
+    # AIML cluster
+    "langchain":        ["generative ai", "python", "natural language processing", "machine learning", "llm"],
+    "hugging face":     ["natural language processing", "python", "deep learning", "transformers", "pytorch"],
+    "reinforcement learning": ["machine learning", "deep learning", "python", "pytorch", "tensorflow"],
+
+    # CSE cluster
+    "graphql":          ["rest apis", "node.js", "react", "javascript", "typescript", "system design"],
+    "kubernetes":       ["docker", "devops", "ci/cd", "cloud computing", "aws", "linux"],
+    "redis":            ["postgresql", "mongodb", "sql", "system design", "node.js", "docker"],
+}
+
 
 async def resolve_skill_names(queries: List[str], db: AsyncSession) -> List[str]:
-    """
-    Expand each query term into itself + all its aliases + canonical names.
-    e.g. 'NLP' → ['NLP', 'Natural Language Processing', 'Text Mining']
-    """
     resolved = set()
     for q in queries:
         q_lower = q.strip().lower()
         resolved.add(q_lower)
 
-        # check if query is an alias → get canonical name
+        # check alias → canonical
         alias_result = await db.execute(
             select(SkillAlias).where(func.lower(SkillAlias.alias_text) == q_lower)
         )
@@ -33,7 +65,6 @@ async def resolve_skill_names(queries: List[str], db: AsyncSession) -> List[str]
             canonical = await db.get(Skill, alias.canonical_skill_id)
             if canonical:
                 resolved.add(canonical.name.lower())
-                # also grab all other aliases of this canonical skill
                 all_aliases = await db.execute(
                     select(SkillAlias).where(
                         SkillAlias.canonical_skill_id == canonical.id
@@ -42,7 +73,7 @@ async def resolve_skill_names(queries: List[str], db: AsyncSession) -> List[str]
                 for a in all_aliases.scalars().all():
                     resolved.add(a.alias_text.lower())
 
-        # check if query IS a canonical skill → grab all its aliases
+        # check canonical → all its aliases
         skill_result = await db.execute(
             select(Skill).where(func.lower(Skill.name) == q_lower)
         )
@@ -57,11 +88,20 @@ async def resolve_skill_names(queries: List[str], db: AsyncSession) -> List[str]
     return list(resolved)
 
 
+def expand_with_clusters(resolved_terms: List[str]) -> List[str]:
+    """
+    Expand search terms using skill clusters.
+    This gives TF-IDF enough vocabulary to find semantically
+    related users even when no alias exists.
+    """
+    expanded = set(resolved_terms)
+    for term in resolved_terms:
+        if term in SKILL_CLUSTERS:
+            expanded.update(SKILL_CLUSTERS[term])
+    return list(expanded)
+
+
 def build_user_skill_corpus(users: List[User]) -> List[str]:
-    """
-    Each user becomes a document: their skills joined as a space-separated string.
-    TF-IDF vectorizes this for cosine similarity matching.
-    """
     return [
         " ".join(us.skill.name.lower() for us in u.user_skills)
         for u in users
@@ -79,10 +119,13 @@ async def search_users(
     if not skills or all(s.strip() == "" for s in skills):
         raise HTTPException(status_code=400, detail="At least one skill query is required.")
 
-    # 1. expand queries through alias graph
+    # 1. expand through alias graph
     expanded_terms = await resolve_skill_names(skills, db)
 
-    # 2. load all active users with their skills
+    # 2. further expand through skill clusters for TF-IDF
+    cluster_expanded = expand_with_clusters(expanded_terms)
+
+    # 3. load all active users with skills
     query = (
         select(User)
         .options(selectinload(User.user_skills).selectinload(UserSkill.skill))
@@ -99,7 +142,7 @@ async def search_users(
     if not all_users:
         return {"exact": [], "similar": []}
 
-    # 3. exact match — user has at least one skill matching any expanded term
+    # 4. split into exact vs non-exact
     exact_users = []
     non_exact_users = []
 
@@ -107,10 +150,11 @@ async def search_users(
         user_skill_names = {us.skill.name.lower() for us in user.user_skills}
         user.skills = [us.skill for us in user.user_skills]
 
-        # check if any expanded term matches any of the user's skills
         matched = any(
-            any(term in skill_name or skill_name in term
-                for skill_name in user_skill_names)
+            any(
+                term in skill_name or skill_name in term
+                for skill_name in user_skill_names
+            )
             for term in expanded_terms
         )
         if matched:
@@ -118,46 +162,48 @@ async def search_users(
         else:
             non_exact_users.append(user)
 
-    # 4. TF-IDF cosine similarity for "similar" fallback
+    # 5. TF-IDF on non-exact users using cluster-expanded query
     similar_users = []
 
     if non_exact_users:
         try:
-            query_doc   = " ".join(expanded_terms)
-            corpus      = build_user_skill_corpus(non_exact_users)
-            all_docs    = [query_doc] + corpus
+            # use cluster-expanded terms as the query document
+            # this gives TF-IDF vocabulary overlap with related skills
+            query_doc = " ".join(cluster_expanded)
+            corpus    = build_user_skill_corpus(non_exact_users)
+            all_docs  = [query_doc] + corpus
 
-            vectorizer  = TfidfVectorizer(
+            vectorizer = TfidfVectorizer(
                 analyzer='word',
                 ngram_range=(1, 2),
                 min_df=1,
                 sublinear_tf=True,
             )
-            tfidf_matrix = vectorizer.fit_transform(all_docs)
-            query_vec    = tfidf_matrix[0]
-            user_vecs    = tfidf_matrix[1:]
+            tfidf_matrix  = vectorizer.fit_transform(all_docs)
+            query_vec     = tfidf_matrix[0]
+            user_vecs     = tfidf_matrix[1:]
 
-            similarities = cosine_similarity(query_vec, user_vecs).flatten()
+            similarities  = cosine_similarity(query_vec, user_vecs).flatten()
 
-            # take users above similarity threshold, ranked
-            threshold    = 0.05
-            ranked       = sorted(
-                [(non_exact_users[i], float(similarities[i]))
-                 for i in range(len(non_exact_users))
-                 if similarities[i] > threshold],
+            threshold = 0.01
+            ranked = sorted(
+                [
+                    (non_exact_users[i], float(similarities[i]))
+                    for i in range(len(non_exact_users))
+                    if similarities[i] > threshold
+                ],
                 key=lambda x: x[1],
                 reverse=True,
             )
-            similar_users = [u for u, _ in ranked[:12]]
+            similar_users = [u for u, _ in ranked[:15]]
 
         except Exception:
             similar_users = []
 
-    # 5. serialize — reuse UserOut structure
     def serialize(user: User) -> dict:
         return {
             "id":         user.id,
-            "username": user.username,
+            "username":   user.username,
             "full_name":  user.full_name,
             "email":      user.email,
             "branch":     user.branch,
