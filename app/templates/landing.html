@@ -141,10 +141,10 @@
         // ── ANIMATED COUNTERS ──────────────────────────────────────
         async function loadStats() {
             try {
-                const res = await fetch('/skills/?limit=1');
-                const skillRes = await fetch('/skills/');
-                const skills = await skillRes.json();
-                animateCount('statSkills', skills.length);
+                const res  = await fetch('/stats');
+                const data = await res.json();
+                animateCount('statStudents', data.students);
+                animateCount('statSkills', data.skills);
             } catch { }
         }
 
@@ -165,7 +165,6 @@
         }
 
         loadStats();
-        animateCount('statStudents', 0);
 
         // ── PARTICLE CANVAS ────────────────────────────────────────
         const canvas = document.getElementById('particle-canvas');

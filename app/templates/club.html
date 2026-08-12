@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Club — SymbiCircle</title>
+  <link rel="stylesheet" href="/static/css/style.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>" />
+</head>
+<body>
+
+<canvas id="particle-canvas"></canvas>
+<div class="bg-orbs"><div class="orb-mid"></div></div>
+
+<nav class="navbar">
+  <a href="/dashboard" class="navbar-brand">⚡ SymbiCircle</a>
+  <div class="navbar-nav">
+    <a href="/dashboard" class="nav-link">🔍 Find</a>
+    <a href="/events" class="nav-link">📅 Events</a>
+    <a href="/clubs" class="nav-link active">🏛️ Clubs</a>
+    <a href="#" class="nav-link" id="myProfileLink">My Profile</a>
+    <button class="btn btn-ghost btn-sm" id="logoutBtn">Sign out</button>
+    <button class="theme-toggle" id="themeToggle">🌙</button>
+  </div>
+</nav>
+
+<div class="page-wrapper pt-nav">
+  <div class="container" style="max-width:900px;padding-top:2rem;padding-bottom:4rem;">
+
+    <!-- Loading -->
+    <div id="clubLoading">
+      <div class="card card-lg">
+        <div class="skeleton skeleton-title" style="width:40%;margin-bottom:0.75rem;"></div>
+        <div class="skeleton skeleton-text" style="width:60%;margin-bottom:0.5rem;"></div>
+        <div class="skeleton skeleton-text" style="width:30%;"></div>
+      </div>
+    </div>
+
+    <!-- Club content -->
+    <div id="clubContent" style="display:none;">
+
+      <!-- Header -->
+      <div class="card card-lg" style="margin-bottom:1.5rem;animation:cardEntrance 0.5s ease both;">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;flex-wrap:wrap;">
+          <div style="flex:1;">
+            <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:0.75rem;">
+              <span id="clubCatIcon" style="font-size:2rem;"></span>
+              <span id="clubCategory" class="badge badge-violet"></span>
+            </div>
+            <h1 id="clubName" class="font-primary" style="font-size:1.8rem;font-weight:700;margin-bottom:0.5rem;"></h1>
+            <p id="clubDesc" class="text-secondary" style="font-size:0.9rem;line-height:1.7;margin-bottom:1rem;"></p>
+            <div id="clubMeta" class="text-muted" style="font-size:0.82rem;"></div>
+          </div>
+          <div>
+            <button id="joinBtn" class="btn btn-primary" style="min-width:120px;"></button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Events in this club -->
+      <h2 class="font-primary" style="font-size:1.1rem;font-weight:700;margin-bottom:1rem;">
+        Upcoming Events
+      </h2>
+
+      <div id="clubEventsGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1rem;margin-bottom:2rem;"></div>
+
+      <div id="noEvents" style="display:none;" class="empty-state" style="padding:2rem;">
+        <div class="empty-state-icon">📅</div>
+        <div class="empty-state-title">No upcoming events</div>
+        <div class="empty-state-text">This club hasn't posted any upcoming events yet.</div>
+      </div>
+
+    </div>
+
+    <!-- Error -->
+    <div id="clubError" style="display:none;" class="empty-state">
+      <div class="empty-state-icon">😕</div>
+      <div class="empty-state-title">Club not found</div>
+      <a href="/clubs" class="btn btn-primary" style="margin-top:1rem;">Back to Clubs</a>
+    </div>
+
+  </div>
+</div>
+
+<div class="toast-container" id="toastContainer"></div>
+
+<script>
+// ── THEME ──────────────────────────────────────────────────
+const html = document.documentElement;
+const themeBtn = document.getElementById('themeToggle');
+const savedTheme = localStorage.getItem('sc-theme') || 'dark';
+html.setAttribute('data-theme', savedTheme);
+themeBtn.textContent = savedTheme === 'dark' ? '🌙' : '☀️';
+themeBtn.addEventListener('click', () => {
+  const next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+  html.setAttribute('data-theme', next);
+  localStorage.setItem('sc-theme', next);
+  themeBtn.textContent = next === 'dark' ? '🌙' : '☀️';
+});
+
+const token = localStorage.getItem('sc-token');
+if (!token) window.location.href = '/login';
+const authHeaders = { 'Authorization': `Bearer ${token}` };
+
+document.getElementById('logoutBtn').addEventListener('click', () => {
+  localStorage.removeItem('sc-token');
+  window.location.href = '/';
+});
+
+async function loadMe() {
+  try {
+    const res = await fetch('/auth/me', { headers: authHeaders });
+    if (!res.ok) { localStorage.removeItem('sc-token'); window.location.href = '/login'; return; }
+    const me = await res.json();
+    document.getElementById('myProfileLink').href = `/profile/${me.username || me.id}`;
+  } catch {}
+}
+loadMe();
+
+// ── RESOLVE SLUG FROM URL ──────────────────────────────────
+const slug = window.location.pathname.split('/').filter(Boolean).pop();
+
+const CAT_ICONS = {
+  technical:   '⚙️',
+  engineering: '🔧',
+  innovation:  '💡',
+  cultural:    '🎭',
+  social:      '🤝',
+};
+
+let clubData = null;
+let isMember = false;
+
+async function loadClub() {
+  try {
+    const res = await fetch(`/api/clubs/${slug}`, { headers: authHeaders });
+    if (!res.ok) {
+      document.getElementById('clubLoading').style.display = 'none';
+      document.getElementById('clubError').style.display = 'block';
+      return;
+    }
+
+    clubData = await res.json();
+
+    document.getElementById('clubLoading').style.display = 'none';
+    document.getElementById('clubContent').style.display = 'block';
+
+    document.title = `${clubData.name} — SymbiCircle`;
+    document.getElementById('clubName').textContent     = clubData.name;
+    document.getElementById('clubDesc').textContent     = clubData.description || '';
+    document.getElementById('clubCategory').textContent = clubData.category;
+    document.getElementById('clubCatIcon').textContent  = CAT_ICONS[clubData.category] || '🏛️';
+    document.getElementById('clubMeta').textContent     = `👥 ${clubData.member_count} members`;
+
+    // check membership — look through current user clubs
+    await checkMembership();
+    renderEvents(clubData.events || []);
+
+  } catch {
+    document.getElementById('clubLoading').style.display = 'none';
+    document.getElementById('clubError').style.display = 'block';
+  }
+}
+
+async function checkMembership() {
+  try {
+    const res  = await fetch('/auth/me', { headers: authHeaders });
+    const me   = await res.json();
+
+    // check user_clubs — we'll infer from a simple heuristic:
+    // try joining and see if 409 (already member)
+    // Instead just use a separate lightweight call — check via club members
+    // For now default to unknown and update after join/leave attempt
+    updateJoinBtn(false);
+  } catch {}
+}
+
+function updateJoinBtn(member) {
+  isMember = member;
+  const btn = document.getElementById('joinBtn');
+  btn.textContent  = member ? '✓ Member' : 'Join Club';
+  btn.className    = member ? 'btn btn-secondary' : 'btn btn-primary';
+}
+
+document.getElementById('joinBtn').addEventListener('click', async () => {
+  const btn = document.getElementById('joinBtn');
+  btn.classList.add('loading');
+
+  const method = isMember ? 'DELETE' : 'POST';
+  try {
+    const res  = await fetch(`/api/clubs/${slug}/join`, { method, headers: authHeaders });
+    const data = await res.json();
+
+    if (res.ok || res.status === 409) {
+      if (res.status === 409 && !isMember) {
+        // already a member
+        updateJoinBtn(true);
+        showToast('You are already a member.', 'info');
+      } else {
+        updateJoinBtn(!isMember);
+        showToast(data.detail, isMember ? 'info' : 'success');
+        // refresh member count
+        const refreshed = await fetch(`/api/clubs/${slug}`, { headers: authHeaders });
+        if (refreshed.ok) {
+          const d = await refreshed.json();
+          document.getElementById('clubMeta').textContent = `👥 ${d.member_count} members`;
+        }
+      }
+    } else {
+      showToast(data.detail || 'Something went wrong.', 'error');
+    }
+  } catch {
+    showToast('Network error.', 'error');
+  } finally {
+    btn.classList.remove('loading');
+  }
+});
+
+function renderEvents(events) {
+  const grid    = document.getElementById('clubEventsGrid');
+  const noEvts  = document.getElementById('noEvents');
+
+  if (!events.length) {
+    noEvts.style.display = 'block';
+    return;
+  }
+
+  grid.innerHTML = events.map(e => {
+    const date = e.event_date
+      ? new Date(e.event_date).toLocaleDateString('en-IN', {day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'})
+      : 'Date TBD';
+    const spotsLeft = e.capacity ? e.capacity - e.registered_count : null;
+    const full      = spotsLeft !== null && spotsLeft <= 0;
+
+    return `
+      <div class="card" style="display:flex;flex-direction:column;">
+        <h3 class="font-primary" style="font-size:0.95rem;font-weight:700;margin-bottom:0.5rem;line-height:1.4;">
+          ${e.title}
+        </h3>
+        <p class="text-secondary" style="font-size:0.8rem;line-height:1.6;flex:1;margin-bottom:0.75rem;">
+          ${e.description ? e.description.slice(0,100) + (e.description.length > 100 ? '…' : '') : ''}
+        </p>
+        <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:0.25rem;">📅 ${date}</div>
+        ${e.location ? `<div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:0.75rem;">📍 ${e.location}</div>` : ''}
+        ${spotsLeft !== null ? `<div style="font-size:0.75rem;color:${full?'#f87171':'var(--text-muted)'};margin-bottom:0.75rem;">
+          👥 ${e.registered_count}/${e.capacity} · ${full ? 'Full' : spotsLeft + ' spots left'}
+        </div>` : ''}
+        <button class="btn ${e.is_registered ? 'btn-secondary' : (full ? 'btn-ghost' : 'btn-primary')} btn-sm w-full event-reg-btn"
+          data-id="${e.id}" data-registered="${e.is_registered}" ${full && !e.is_registered ? 'disabled' : ''}>
+          ${e.is_registered ? '✓ Registered' : (full ? 'Full' : 'Register')}
+        </button>
+      </div>`;
+  }).join('');
+
+  document.querySelectorAll('.event-reg-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const id  = btn.dataset.id;
+      const reg = btn.dataset.registered === 'true';
+      btn.classList.add('loading');
+      try {
+        const res  = await fetch(`/api/events/${id}/register`, {
+          method: reg ? 'DELETE' : 'POST',
+          headers: authHeaders,
+        });
+        const data = await res.json();
+        if (res.ok) {
+          showToast(reg ? 'Registration cancelled.' : 'Registered! 🎉', reg ? 'info' : 'success');
+          loadClub(); // refresh
+        } else {
+          showToast(data.detail || 'Something went wrong.', 'error');
+          btn.classList.remove('loading');
+        }
+      } catch {
+        showToast('Network error.', 'error');
+        btn.classList.remove('loading');
+      }
+    });
+  });
+}
+
+// ── PARTICLE CANVAS ────────────────────────────────────────
+const canvas = document.getElementById('particle-canvas');
+const ctx = canvas.getContext('2d');
+let pts = [];
+function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+class P {
+  constructor(){this.reset();}
+  reset(){
+    this.x=Math.random()*canvas.width; this.y=Math.random()*canvas.height;
+    this.vx=(Math.random()-.5)*.25; this.vy=(Math.random()-.5)*.25;
+    this.r=Math.random()*1.2+.3; this.a=Math.random()*.3+.05;
+    this.c=Math.random()>.5?'124,58,237':'6,182,212';
+  }
+  update(){
+    this.x+=this.vx; this.y+=this.vy;
+    if(this.x<0||this.x>canvas.width||this.y<0||this.y>canvas.height)this.reset();
+  }
+  draw(){
+    ctx.beginPath(); ctx.arc(this.x,this.y,this.r,0,Math.PI*2);
+    ctx.fillStyle=`rgba(${this.c},${this.a})`; ctx.fill();
+  }
+}
+resize();
+pts=Array.from({length:50},()=>new P());
+(function loop(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  pts.forEach(p=>{p.update();p.draw();});
+  requestAnimationFrame(loop);
+})();
+window.addEventListener('resize',resize);
+
+// ── TOAST ─────────────────────────────────────────────────
+window.showToast = (msg, type='info') => {
+  const icons={success:'✅',error:'❌',info:'ℹ️'};
+  const c=document.getElementById('toastContainer');
+  const t=document.createElement('div');
+  t.className=`toast ${type}`;
+  t.innerHTML=`<span class="toast-icon">${icons[type]}</span><span>${msg}</span>`;
+  c.appendChild(t);
+  setTimeout(()=>{t.classList.add('removing');setTimeout(()=>t.remove(),200);},3500);
+};
+
+loadClub();
+</script>
+</body>
+</html>

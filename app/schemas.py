@@ -80,3 +80,46 @@ class UserOut(BaseModel):
     skills: List[SkillOut] = []
 
     model_config = {"from_attributes": True}
+
+# ── Club ─────────────────────────────────────────────────────────────────────
+
+class ClubOut(BaseModel):
+    id: str
+    name: str
+    slug: str
+    description: Optional[str] = None
+    category: str
+    member_count: int = 0
+
+    model_config = {"from_attributes": True}
+
+
+class ClubDetailOut(BaseModel):
+    id: str
+    name: str
+    slug: str
+    description: Optional[str] = None
+    category: str
+    member_count: int = 0
+    events: List["EventOut"] = []
+
+    model_config = {"from_attributes": True}
+
+
+# ── Event ─────────────────────────────────────────────────────────────────────
+
+class EventOut(BaseModel):
+    id: str
+    title: str
+    description: Optional[str] = None
+    location: Optional[str] = None
+    event_date: Optional[datetime] = None
+    capacity: Optional[int] = None
+    registered_count: int = 0
+    is_published: bool
+    club_id: str
+    club_name: str = ""
+    club_slug: str = ""
+    is_registered: bool = False
+
+    model_config = {"from_attributes": True}

@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Clubs — SymbiCircle</title>
+  <link rel="stylesheet" href="/static/css/style.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>" />
+</head>
+<body>
+
+<canvas id="particle-canvas"></canvas>
+<div class="bg-orbs"><div class="orb-mid"></div></div>
+
+<nav class="navbar">
+  <a href="/dashboard" class="navbar-brand">⚡ SymbiCircle</a>
+  <div class="navbar-nav">
+    <a href="/dashboard" class="nav-link">🔍 Find</a>
+    <a href="/events" class="nav-link">📅 Events</a>
+    <a href="/clubs" class="nav-link active">🏛️ Clubs</a>
+    <a href="#" class="nav-link" id="myProfileLink">My Profile</a>
+    <button class="btn btn-ghost btn-sm" id="logoutBtn">Sign out</button>
+    <button class="theme-toggle" id="themeToggle">🌙</button>
+  </div>
+</nav>
+
+<div class="page-wrapper pt-nav">
+  <div class="container" style="max-width:1100px;padding-top:2rem;padding-bottom:4rem;">
+
+    <div style="margin-bottom:2rem;">
+      <h1 class="font-primary" style="font-size:1.8rem;font-weight:700;margin-bottom:0.25rem;">
+        Campus <span class="text-gradient">Clubs</span>
+      </h1>
+      <p class="text-secondary" style="font-size:0.9rem;">All 25 active clubs at SIT Pune. Join the ones that match your interests.</p>
+    </div>
+
+    <!-- Category tabs -->
+    <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:2rem;" id="categoryTabs">
+      <button class="btn btn-primary btn-sm cat-tab" data-cat="">All</button>
+      <button class="btn btn-ghost btn-sm cat-tab" data-cat="technical">⚙️ Technical</button>
+      <button class="btn btn-ghost btn-sm cat-tab" data-cat="engineering">🔧 Engineering</button>
+      <button class="btn btn-ghost btn-sm cat-tab" data-cat="innovation">💡 Innovation</button>
+      <button class="btn btn-ghost btn-sm cat-tab" data-cat="cultural">🎭 Cultural</button>
+      <button class="btn btn-ghost btn-sm cat-tab" data-cat="social">🤝 Social</button>
+    </div>
+
+    <!-- Grid -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:1.25rem;" id="clubsGrid"></div>
+
+    <div id="emptyState" style="display:none;" class="empty-state">
+      <div class="empty-state-icon">🏛️</div>
+      <div class="empty-state-title">No clubs found</div>
+    </div>
+
+  </div>
+</div>
+
+<div class="toast-container" id="toastContainer"></div>
+
+<script>
+// ── THEME ──────────────────────────────────────────────────
+const html = document.documentElement;
+const themeBtn = document.getElementById('themeToggle');
+const savedTheme = localStorage.getItem('sc-theme') || 'dark';
+html.setAttribute('data-theme', savedTheme);
+themeBtn.textContent = savedTheme === 'dark' ? '🌙' : '☀️';
+themeBtn.addEventListener('click', () => {
+  const next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+  html.setAttribute('data-theme', next);
+  localStorage.setItem('sc-theme', next);
+  themeBtn.textContent = next === 'dark' ? '🌙' : '☀️';
+});
+
+const token = localStorage.getItem('sc-token');
+if (!token) window.location.href = '/login';
+const authHeaders = { 'Authorization': `Bearer ${token}` };
+
+document.getElementById('logoutBtn').addEventListener('click', () => {
+  localStorage.removeItem('sc-token');
+  window.location.href = '/';
+});
+
+async function loadMe() {
+  try {
+    const res = await fetch('/auth/me', { headers: authHeaders });
+    if (!res.ok) { localStorage.removeItem('sc-token'); window.location.href = '/login'; return; }
+    const me = await res.json();
+    document.getElementById('myProfileLink').href = `/profile/${me.username || me.id}`;
+  } catch {}
+}
+loadMe();
+
+// ── CATEGORY FILTER ────────────────────────────────────────
+let activeCategory = '';
+let allClubs = [];
+
+document.querySelectorAll('.cat-tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.cat-tab').forEach(b => {
+      b.classList.remove('btn-primary'); b.classList.add('btn-ghost');
+    });
+    btn.classList.remove('btn-ghost'); btn.classList.add('btn-primary');
+    activeCategory = btn.dataset.cat;
+    renderClubs();
+  });
+});
+
+// ── CATEGORY ICONS ─────────────────────────────────────────
+const CAT_ICONS = {
+  technical:   '⚙️',
+  engineering: '🔧',
+  innovation:  '💡',
+  cultural:    '🎭',
+  social:      '🤝',
+};
+
+function renderClubs() {
+  const filtered = activeCategory
+    ? allClubs.filter(c => c.category === activeCategory)
+    : allClubs;
+
+  const grid = document.getElementById('clubsGrid');
+  const empty = document.getElementById('emptyState');
+
+  if (!filtered.length) {
+    grid.innerHTML = '';
+    empty.style.display = 'block';
+    return;
+  }
+
+  empty.style.display = 'none';
+  grid.innerHTML = filtered.map(club => `
+    <div class="card" style="cursor:pointer;display:flex;flex-direction:column;"
+      onclick="window.location.href='/clubs/${club.slug}'">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;">
+        <span style="font-size:1.5rem;">${CAT_ICONS[club.category] || '🏛️'}</span>
+        <span class="badge badge-violet" style="font-size:0.68rem;">${club.category}</span>
+      </div>
+      <h3 class="font-primary" style="font-size:0.95rem;font-weight:700;margin-bottom:0.4rem;">
+        ${club.name}
+      </h3>
+      <p class="text-secondary" style="font-size:0.8rem;line-height:1.6;flex:1;margin-bottom:1rem;">
+        ${club.description ? club.description.slice(0, 90) + (club.description.length > 90 ? '…' : '') : ''}
+      </p>
+      <div style="font-size:0.78rem;color:var(--text-muted);">
+        👥 ${club.member_count} members
+      </div>
+    </div>`).join('');
+}
+
+async function loadClubs() {
+  try {
+    const res = await fetch('/api/clubs', { headers: authHeaders });
+    allClubs  = await res.json();
+    renderClubs();
+  } catch {
+    showToast('Failed to load clubs.', 'error');
+  }
+}
+
+// ── PARTICLE + TOAST (shared) ──────────────────────────────
+const canvas = document.getElementById('particle-canvas');
+const ctx = canvas.getContext('2d');
+let pts = [];
+function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+class P {
+  constructor(){this.reset();}
+  reset(){
+    this.x=Math.random()*canvas.width; this.y=Math.random()*canvas.height;
+    this.vx=(Math.random()-.5)*.25; this.vy=(Math.random()-.5)*.25;
+    this.r=Math.random()*1.2+.3; this.a=Math.random()*.3+.05;
+    this.c=Math.random()>.5?'124,58,237':'6,182,212';
+  }
+  update(){
+    this.x+=this.vx; this.y+=this.vy;
+    if(this.x<0||this.x>canvas.width||this.y<0||this.y>canvas.height)this.reset();
+  }
+  draw(){
+    ctx.beginPath(); ctx.arc(this.x,this.y,this.r,0,Math.PI*2);
+    ctx.fillStyle=`rgba(${this.c},${this.a})`; ctx.fill();
+  }
+}
+resize();
+pts=Array.from({length:50},()=>new P());
+(function loop(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  pts.forEach(p=>{p.update();p.draw();});
+  requestAnimationFrame(loop);
+})();
+window.addEventListener('resize',resize);
+
+window.showToast = (msg, type='info') => {
+  const icons={success:'✅',error:'❌',info:'ℹ️'};
+  const c=document.getElementById('toastContainer');
+  const t=document.createElement('div');
+  t.className=`toast ${type}`;
+  t.innerHTML=`<span class="toast-icon">${icons[type]}</span><span>${msg}</span>`;
+  c.appendChild(t);
+  setTimeout(()=>{t.classList.add('removing');setTimeout(()=>t.remove(),200);},3500);
+};
+
+loadClubs();
+</script>
+</body>
+</html>

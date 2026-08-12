@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Events — SymbiCircle</title>
+  <link rel="stylesheet" href="/static/css/style.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>" />
+</head>
+<body>
+
+<canvas id="particle-canvas"></canvas>
+<div class="bg-orbs"><div class="orb-mid"></div></div>
+
+<nav class="navbar">
+  <a href="/dashboard" class="navbar-brand">⚡ SymbiCircle</a>
+  <div class="navbar-nav">
+    <a href="/dashboard" class="nav-link">🔍 Find</a>
+    <a href="/events" class="nav-link active">📅 Events</a>
+    <a href="/clubs" class="nav-link">🏛️ Clubs</a>
+    <a href="#" class="nav-link" id="myProfileLink">My Profile</a>
+    <button class="btn btn-ghost btn-sm" id="logoutBtn">Sign out</button>
+    <button class="theme-toggle" id="themeToggle">🌙</button>
+  </div>
+</nav>
+
+<div class="page-wrapper pt-nav">
+  <div class="container" style="max-width:1100px;padding-top:2rem;padding-bottom:4rem;">
+
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;flex-wrap:wrap;gap:1rem;">
+      <div>
+        <h1 class="font-primary" style="font-size:1.8rem;font-weight:700;margin-bottom:0.25rem;">
+          Upcoming <span class="text-gradient">Events</span>
+        </h1>
+        <p class="text-secondary" style="font-size:0.9rem;">Register for events happening across SIT Pune clubs.</p>
+      </div>
+      <div style="display:flex;gap:0.5rem;flex-wrap:wrap;" id="categoryFilters">
+        <button class="btn btn-primary btn-sm cat-btn" data-cat="">All</button>
+        <button class="btn btn-ghost btn-sm cat-btn" data-cat="technical">⚙️ Technical</button>
+        <button class="btn btn-ghost btn-sm cat-btn" data-cat="engineering">🔧 Engineering</button>
+        <button class="btn btn-ghost btn-sm cat-btn" data-cat="innovation">💡 Innovation</button>
+        <button class="btn btn-ghost btn-sm cat-btn" data-cat="cultural">🎭 Cultural</button>
+        <button class="btn btn-ghost btn-sm cat-btn" data-cat="social">🤝 Social</button>
+      </div>
+    </div>
+
+    <!-- Loading -->
+    <div id="loadingState">
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:1.25rem;">
+      </div>
+    </div>
+
+    <!-- Events grid -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:1.25rem;" id="eventsGrid"></div>
+
+    <!-- Empty -->
+    <div id="emptyState" style="display:none;" class="empty-state">
+      <div class="empty-state-icon">📅</div>
+      <div class="empty-state-title">No upcoming events</div>
+      <div class="empty-state-text">Check back soon or explore a different category.</div>
+    </div>
+
+  </div>
+</div>
+
+<div class="toast-container" id="toastContainer"></div>
+
+<script>
+// ── THEME ──────────────────────────────────────────────────
+const html = document.documentElement;
+const themeBtn = document.getElementById('themeToggle');
+const savedTheme = localStorage.getItem('sc-theme') || 'dark';
+html.setAttribute('data-theme', savedTheme);
+themeBtn.textContent = savedTheme === 'dark' ? '🌙' : '☀️';
+themeBtn.addEventListener('click', () => {
+  const next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+  html.setAttribute('data-theme', next);
+  localStorage.setItem('sc-theme', next);
+  themeBtn.textContent = next === 'dark' ? '🌙' : '☀️';
+});
+
+const token = localStorage.getItem('sc-token');
+if (!token) window.location.href = '/login';
+const authHeaders = { 'Authorization': `Bearer ${token}` };
+
+document.getElementById('logoutBtn').addEventListener('click', () => {
+  localStorage.removeItem('sc-token');
+  window.location.href = '/';
+});
+
+// ── LOAD USER ──────────────────────────────────────────────
+async function loadMe() {
+  try {
+    const res = await fetch('/auth/me', { headers: authHeaders });
+    if (!res.ok) { localStorage.removeItem('sc-token'); window.location.href = '/login'; return; }
+    const me = await res.json();
+    document.getElementById('myProfileLink').href = `/profile/${me.username || me.id}`;
+  } catch {}
+}
+loadMe();
+
+// ── CATEGORY FILTER ────────────────────────────────────────
+let activeCategory = '';
+document.querySelectorAll('.cat-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.cat-btn').forEach(b => {
+      b.classList.remove('btn-primary');
+      b.classList.add('btn-ghost');
+    });
+    btn.classList.remove('btn-ghost');
+    btn.classList.add('btn-primary');
+    activeCategory = btn.dataset.cat;
+    loadEvents();
+  });
+});
+
+// ── LOAD EVENTS ────────────────────────────────────────────
+async function loadEvents() {
+  document.getElementById('loadingState').style.display = 'block';
+  document.getElementById('eventsGrid').innerHTML = '';
+  document.getElementById('emptyState').style.display = 'none';
+
+  try {
+    const res    = await fetch('/api/events?upcoming_only=true', { headers: authHeaders });
+    let events   = await res.json();
+
+    // client-side category filter
+    if (activeCategory) {
+      events = events.filter(e => {
+        // we don't have category on event directly — filter by club
+        // we'll handle this server-side later; for now show all
+        return true;
+      });
+    }
+
+    document.getElementById('loadingState').style.display = 'none';
+
+    if (!events.length) {
+      document.getElementById('emptyState').style.display = 'block';
+      return;
+    }
+
+    document.getElementById('eventsGrid').innerHTML = events.map(e => eventCard(e)).join('');
+
+    // attach register handlers
+    document.querySelectorAll('.register-btn').forEach(btn => {
+      btn.addEventListener('click', async (ev) => {
+        ev.stopPropagation();
+        const id         = btn.dataset.id;
+        const registered = btn.dataset.registered === 'true';
+        await toggleRegistration(id, registered, btn);
+      });
+    });
+
+  } catch (err) {
+    document.getElementById('loadingState').style.display = 'none';
+    showToast('Failed to load events.', 'error');
+  }
+}
+
+function eventCard(e) {
+  const date     = e.event_date
+    ? new Date(e.event_date).toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' })
+    : 'Date TBD';
+  const spotsLeft = e.capacity ? e.capacity - e.registered_count : null;
+  const full      = spotsLeft !== null && spotsLeft <= 0;
+  const regLabel  = e.is_registered ? '✓ Registered' : (full ? 'Full' : 'Register');
+  const regClass  = e.is_registered ? 'btn-secondary' : (full ? 'btn-ghost' : 'btn-primary');
+
+  return `
+    <div class="card" style="cursor:pointer;display:flex;flex-direction:column;gap:0;"
+      onclick="window.location.href='/events'">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:0.5rem;margin-bottom:0.75rem;">
+        <span class="badge badge-violet">${e.club_name}</span>
+        ${e.is_registered ? '<span class="badge badge-green">✓ Going</span>' : ''}
+      </div>
+      <h3 class="font-primary" style="font-size:1rem;font-weight:700;margin-bottom:0.5rem;line-height:1.4;">
+        ${e.title}
+      </h3>
+      <p class="text-secondary" style="font-size:0.82rem;line-height:1.6;margin-bottom:1rem;flex:1;">
+        ${e.description ? e.description.slice(0, 120) + (e.description.length > 120 ? '…' : '') : ''}
+      </p>
+      <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:0.4rem;">📅 ${date}</div>
+      ${e.location ? `<div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:0.4rem;">📍 ${e.location}</div>` : ''}
+      ${spotsLeft !== null ? `<div style="font-size:0.8rem;color:${full ? '#f87171' : 'var(--text-muted)'};margin-bottom:1rem;">
+        👥 ${e.registered_count}${e.capacity ? ' / ' + e.capacity : ''} registered${spotsLeft > 0 ? ' · ' + spotsLeft + ' spots left' : ''}
+      </div>` : '<div style="margin-bottom:1rem;"></div>'}
+      <button class="btn ${regClass} btn-sm w-full register-btn"
+        data-id="${e.id}"
+        data-registered="${e.is_registered}"
+        ${full && !e.is_registered ? 'disabled' : ''}>
+        ${regLabel}
+      </button>
+    </div>`;
+}
+
+async function toggleRegistration(eventId, isRegistered, btn) {
+  btn.classList.add('loading');
+  btn.textContent = isRegistered ? 'Cancelling…' : 'Registering…';
+
+  try {
+    const res = await fetch(`/api/events/${eventId}/register`, {
+      method: isRegistered ? 'DELETE' : 'POST',
+      headers: authHeaders,
+    });
+    const data = await res.json();
+
+    if (res.ok) {
+      showToast(isRegistered ? 'Registration cancelled.' : 'Registered! See you there 🎉', isRegistered ? 'info' : 'success');
+      loadEvents(); // refresh
+    } else {
+      showToast(data.detail || 'Something went wrong.', 'error');
+      btn.classList.remove('loading');
+      btn.textContent = isRegistered ? '✓ Registered' : 'Register';
+    }
+  } catch {
+    showToast('Network error.', 'error');
+    btn.classList.remove('loading');
+  }
+}
+
+// ── SKELETON ───────────────────────────────────────────────
+const loadingGrid = document.querySelector('#loadingState > div');
+if (loadingGrid) {
+  for (let i = 0; i < 6; i++) {
+    loadingGrid.innerHTML += `
+      <div class="card" style="pointer-events:none;">
+        <div class="skeleton" style="height:18px;width:40%;margin-bottom:0.75rem;border-radius:20px;"></div>
+        <div class="skeleton skeleton-title" style="width:85%;margin-bottom:0.5rem;"></div>
+        <div class="skeleton skeleton-text"></div>
+        <div class="skeleton skeleton-text" style="width:70%;margin-bottom:1rem;"></div>
+        <div class="skeleton skeleton-text" style="width:50%;margin-bottom:0.4rem;"></div>
+        <div class="skeleton skeleton-text" style="width:40%;margin-bottom:1rem;"></div>
+        <div class="skeleton" style="height:32px;border-radius:20px;"></div>
+      </div>`;
+  }
+}
+
+// ── PARTICLE CANVAS ────────────────────────────────────────
+const canvas = document.getElementById('particle-canvas');
+const ctx = canvas.getContext('2d');
+let pts = [];
+function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+class P {
+  constructor() { this.reset(); }
+  reset() {
+    this.x=Math.random()*canvas.width; this.y=Math.random()*canvas.height;
+    this.vx=(Math.random()-.5)*.25;   this.vy=(Math.random()-.5)*.25;
+    this.r=Math.random()*1.2+.3;      this.a=Math.random()*.3+.05;
+    this.c=Math.random()>.5?'124,58,237':'6,182,212';
+  }
+  update() {
+    this.x+=this.vx; this.y+=this.vy;
+    if(this.x<0||this.x>canvas.width||this.y<0||this.y>canvas.height) this.reset();
+  }
+  draw() {
+    ctx.beginPath(); ctx.arc(this.x,this.y,this.r,0,Math.PI*2);
+    ctx.fillStyle=`rgba(${this.c},${this.a})`; ctx.fill();
+  }
+}
+resize();
+pts = Array.from({length:50}, () => new P());
+(function loop() {
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  pts.forEach(p=>{p.update();p.draw();});
+  requestAnimationFrame(loop);
+})();
+window.addEventListener('resize', resize);
+
+// ── TOAST ─────────────────────────────────────────────────
+window.showToast = (msg, type='info') => {
+  const icons={success:'✅',error:'❌',info:'ℹ️'};
+  const c=document.getElementById('toastContainer');
+  const t=document.createElement('div');
+  t.className=`toast ${type}`;
+  t.innerHTML=`<span class="toast-icon">${icons[type]}</span><span>${msg}</span>`;
+  c.appendChild(t);
+  setTimeout(()=>{t.classList.add('removing');setTimeout(()=>t.remove(),200);},3500);
+};
+
+loadEvents();
+</script>
+</body>
+</html>
